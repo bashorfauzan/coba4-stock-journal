@@ -1,0 +1,124 @@
+package com.coba4.stockjournal
+
+import android.Manifest
+import android.content.ComponentName
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.coba4.stockjournal.databinding.ActivityMainBinding
+import com.coba4.stockjournal.service.PreferenceStore
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var preferenceStore: PreferenceStore
+
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        // Request POST_NOTIFICATIONS on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        val enabled = isNotificationServiceEnabled()
+
+        preferenceStore = PreferenceStore(this)
+        
+        binding.baseUrlInput.setText(preferenceStore.getWebhookUrl())
+        binding.webAppUrlInput.setText(preferenceStore.getWebAppUrl())
+        binding.filterKeywordsInput.setText(preferenceStore.getFilterKeywords())
+
+        if (enabled) {
+            val savedWebAppUrl = preferenceStore.getWebAppUrl()
+            if (isValidHttpUrl(savedWebAppUrl)) {
+                preferenceStore.setLastWebAppStatus("Status Web App: mencoba buka $savedWebAppUrl")
+                startActivity(WebAppActivity.createIntent(this, savedWebAppUrl))
+                finish()
+                return
+            } else {
+                preferenceStore.setLastWebAppStatus("Status Web App: URL tidak valid ($savedWebAppUrl)")
+            }
+        }
+
+        binding.saveButton.setOnClickListener {
+            val value = binding.baseUrlInput.text?.toString()?.trim().orEmpty()
+            val webAppUrl = binding.webAppUrlInput.text?.toString()?.trim().orEmpty()
+            val filterKeywords = binding.filterKeywordsInput.text?.toString()?.trim().orEmpty()
+            if (!isValidHttpUrl(value) || !isValidHttpUrl(webAppUrl)) {
+                binding.statusText.text = getString(R.string.status_invalid_url)
+                Toast.makeText(this, R.string.status_invalid_url, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            preferenceStore.setWebhookUrl(value)
+            preferenceStore.setWebAppUrl(webAppUrl)
+            preferenceStore.setFilterKeywords(filterKeywords)
+            preferenceStore.setLastWebAppStatus("Status Web App: URL tersimpan $webAppUrl")
+            binding.statusText.text = getString(R.string.status_saved)
+            binding.lastDeliveryText.text = preferenceStore.getLastDeliveryStatus()
+            binding.webAppStatusText.text = preferenceStore.getLastWebAppStatus()
+            Toast.makeText(this, R.string.status_saved, Toast.LENGTH_SHORT).show()
+        }
+
+        binding.openSettingsButton.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+
+        binding.openWebAppButton.setOnClickListener {
+            val webAppUrl = binding.webAppUrlInput.text?.toString()?.trim().orEmpty()
+            if (!isValidHttpUrl(webAppUrl)) {
+                binding.statusText.text = getString(R.string.web_app_invalid_url)
+                preferenceStore.setLastWebAppStatus("Status Web App: URL tidak valid ($webAppUrl)")
+                binding.webAppStatusText.text = preferenceStore.getLastWebAppStatus()
+                Toast.makeText(this, R.string.web_app_invalid_url, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            preferenceStore.setWebAppUrl(webAppUrl)
+            preferenceStore.setLastWebAppStatus("Status Web App: membuka $webAppUrl")
+            binding.webAppStatusText.text = preferenceStore.getLastWebAppStatus()
+            binding.statusText.text = getString(R.string.status_opening_web_app)
+            startActivity(WebAppActivity.createIntent(this, webAppUrl))
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val enabled = isNotificationServiceEnabled()
+        binding.statusText.text = getString(
+            if (enabled) R.string.status_enabled else R.string.status_disabled
+        )
+        binding.lastDeliveryText.text = preferenceStore.getLastDeliveryStatus()
+        binding.webAppStatusText.text = preferenceStore.getLastWebAppStatus()
+    }
+
+    private fun isNotificationServiceEnabled(): Boolean {
+        val packageName = packageName
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return false
+        return flat.split(":").any {
+            val component = ComponentName.unflattenFromString(it)
+            component?.packageName == packageName
+        }
+    }
+
+    private fun isValidHttpUrl(value: String): Boolean {
+        if (value.isBlank()) return false
+        val parsed = Uri.parse(value)
+        return parsed.scheme == "http" || parsed.scheme == "https"
+    }
+}

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: coba4-stock-journal
+    env: node
+    buildCommand: "npm install && npm install --prefix client && npm install --prefix server && npm run build"
+    startCommand: "npm run start"
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: NODE_ENV
+        value: "production"

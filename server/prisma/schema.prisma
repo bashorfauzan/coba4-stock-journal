@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum StockOrderSide {
+  BUY
+  SELL
+}
+
+enum StockNotificationStatus {
+  MATCHED
+  OPEN
+  IGNORED
+  FAILED
+}
+
+model StockNotification {
+  id              String                  @id @default(cuid())
+  sourceApp       String
+  senderName      String?
+  title           String?
+  messageText     String
+  receivedAt      DateTime                @default(now())
+  status          StockNotificationStatus
+  ticker          String?
+  side            StockOrderSide?
+  pricePerShare   Float?
+  lot             Int?
+  confidenceScore Float?
+  parseNotes      String?
+  rawPayload      String?
+  transaction     StockTransaction?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([receivedAt, status])
+  @@index([ticker, receivedAt])
+}
+
+model StockTransaction {
+  id             String                  @id @default(cuid())
+  notificationId String                  @unique
+  sourceApp      String
+  title          String
+  ticker         String
+  side           StockOrderSide
+  lot            Int
+  pricePerShare  Float
+  grossValue     Float
+  brokerFee      Float
+  netValue       Float
+  tradedAt       DateTime
+  status         StockNotificationStatus
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  notification   StockNotification       @relation(fields: [notificationId], references: [id])
+
+  @@index([ticker, tradedAt])
+  @@index([side, tradedAt])
+}

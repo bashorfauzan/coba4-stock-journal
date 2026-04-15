@@ -1,0 +1,34 @@
+[
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/xml_data_extraction_rules.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/layout_activity_main.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/layout_activity_web_app.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/layout/activity_web_app.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/drawable/ic_launcher_background.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/xml_backup_rules.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.coba4.stockjournal.app-debug-37:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.coba4.stockjournal.app-main-39:/mipmap-anydpi-v26/ic_launcher.xml"
+    }
+]

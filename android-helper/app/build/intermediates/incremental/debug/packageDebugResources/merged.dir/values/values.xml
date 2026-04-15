@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <string name="account_app_opened">Aplikasi rekening dibuka.</string>
+    <string name="account_open_failed">Aplikasi rekening tidak bisa dibuka.</string>
+    <string name="account_store_opened">Halaman store dibuka.</string>
+    <string name="app_name">Coba4 Stock Journal</string>
+    <string name="backend_url_hint">URL endpoint backend</string>
+    <string name="close_web_app">Tutup</string>
+    <string name="filter_keywords_hint">Filter keyword, pisahkan dengan koma</string>
+    <string name="last_delivery_default">Belum ada pengiriman</string>
+    <string name="last_delivery_label">Pengiriman terakhir</string>
+    <string name="listener_service_name">Coba4 Stock Journal Listener</string>
+    <string name="open_external_browser">Buka di Browser</string>
+    <string name="open_notification_settings">Buka Pengaturan Notification Access</string>
+    <string name="open_web_app">Buka Coba4 App</string>
+    <string name="reload_page">Muat Ulang</string>
+    <string name="save_button">Simpan Pengaturan</string>
+    <string name="setup_steps">Langkah setup:\n1. Isi URL backend ke endpoint stock webhook coba4.\n2. Isi URL web app utama.\n3. Atur filter keyword, misalnya rhb,stockbit,ajaib,ipot,matched,open,buy,sell,stock,lot.\n4. Simpan pengaturan.\n5. Buka Notification Access dan aktifkan Coba4.\n6. Tap Buka Coba4 App untuk melihat dashboard web.</string>
+    <string name="setup_subtitle">App ini menangkap notifikasi broker saham, mengirimkannya ke backend coba4, dan bisa membuka dashboard web saham dalam wrapper Android.</string>
+    <string name="setup_title">Coba4 Penghubung Broker</string>
+    <string name="status_disabled">Status: notification access belum aktif</string>
+    <string name="status_enabled">Status: notification access aktif</string>
+    <string name="status_idle">Status: belum dicek</string>
+    <string name="status_invalid_url">URL tidak valid</string>
+    <string name="status_opening_web_app">Membuka Coba4 App…</string>
+    <string name="status_saved">Pengaturan berhasil disimpan</string>
+    <string name="web_app_invalid_url">URL web app tidak valid.</string>
+    <string name="web_app_load_failed">Gagal membuka halaman Coba4 App.</string>
+    <string name="web_app_no_url">URL web app belum diisi.</string>
+    <string name="web_app_status_default">Status Web App: belum dicoba</string>
+    <string name="web_app_title">Coba4 App</string>
+    <string name="web_app_url_hint">URL web app utama</string>
+    <style name="Theme.NovaHelper" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:statusBarColor" ns1:targetApi="l">#F8FAFC</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

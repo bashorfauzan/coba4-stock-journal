@@ -70,12 +70,13 @@ function App() {
 
         // Hitung Summary secara lokal
         const summaryCalc: StockSummary = {
-          notifications: notificationsRes.length, // Menampilkan yg dilimit/total dari Inbox
+          notifications: notificationsRes.length,
           transactions: transactionsRes.length,
           buyCount: 0,
           sellCount: 0,
           buyValue: 0,
-          sellValue: 0
+          sellValue: 0,
+          realizedProfit: 0
         };
 
         transactionsRes.forEach((tx) => {
@@ -105,6 +106,7 @@ function App() {
              sellLots: 0,
              avgBuyPrice: 0,
              realizedSellValue: 0,
+             realizedProfit: 0,
              lastTradeAt: null
           };
 
@@ -116,6 +118,15 @@ function App() {
             current.buyLots += transaction.lot;
             current.netLots = nextLots;
           } else {
+            // Kalkulasi Profit Realisasi: (Harga Jual - Harga Rata-rata Beli) * Lot Jual * 100
+            const saleProfit = (transaction.pricePerShare - current.avgBuyPrice) * transaction.lot * 100;
+            // (Catatan: Ini perhitungan kasar sebelum fee broker transaksi jual itu sendiri, 
+            // untuk lebih akurat bisa menggunakan (netValue jual - (avgBuyPrice * lot * 100))) 
+            // Kita gunakan pendekatan netValue vs cost basis:
+            const costBasisForSale = current.avgBuyPrice * transaction.lot * 100;
+            const profitFromThisSale = transaction.netValue - costBasisForSale;
+            
+            current.realizedProfit += profitFromThisSale;
             current.sellLots += transaction.lot;
             current.netLots -= transaction.lot;
             current.realizedSellValue += transaction.netValue;
@@ -126,6 +137,9 @@ function App() {
         }
 
         const positionsCalc = Array.from(positionsMap.values()).sort((a, b) => a.ticker.localeCompare(b.ticker));
+        
+        // Total Realized Profit untuk Summary
+        summaryCalc.realizedProfit = positionsCalc.reduce((sum, pos) => sum + pos.realizedProfit, 0);
 
         setTransactions(transactionsRes);
         setNotifications(notificationsRes);
@@ -170,12 +184,18 @@ function App() {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 lg:gap-4">
+          <StatCard
+            title="Realized P&L (Cuan/Rugi)"
+            value={summary ? formatCurrency(summary.realizedProfit) : '...'}
+            icon={Activity}
+            iconBg={summary && summary.realizedProfit >= 0 ? "bg-emerald-600" : "bg-red-600"}
+          />
           <StatCard
             title="Transaksi Match"
             value={summary ? formatNumber(summary.transactions) : '...'}
             icon={CheckCircle2}
-            iconBg="bg-emerald-500"
+            iconBg="bg-blue-500"
           />
           <StatCard
             title="Total Nilai Beli"

@@ -57,6 +57,7 @@ export type StockPosition = {
   sellLots: number;
   avgBuyPrice: number;
   realizedSellValue: number;
+  realizedProfit: number;
   lastTradeAt: string | null;
 };
 
@@ -67,4 +68,5 @@ export type StockSummary = {
   sellCount: number;
   buyValue: number;
   sellValue: number;
+  realizedProfit: number;
 };

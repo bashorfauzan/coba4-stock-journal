@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, BellRing, CandlestickChart, Wallet, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
-import { api, type StockNotification, type StockPosition, type StockSummary, type StockTransaction } from './api';
+import { type StockNotification, type StockPosition, type StockSummary, type StockTransaction } from './api';
 import { StatCard } from './components/StatCard';
 
 const formatNumber = (value: number) =>

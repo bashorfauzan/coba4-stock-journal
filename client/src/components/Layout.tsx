@@ -425,22 +425,99 @@ function TransactionTable({ transactions, showBroker = false }: { transactions: 
 }
 
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
-const DEFAULT_FEE_CONFIG = {
-  rhb:      { buy: '0.19', sell: '0.29' },
-  ajaib:    { buy: '0.10', sell: '0.20' },
-  stockbit: { buy: '0.10', sell: '0.20' },
-  ipot:     { buy: '0.19', sell: '0.29' },
-  mirae:    { buy: '0.18', sell: '0.28' },
-};
+type FeeEntry = { name: string; buy: string; sell: string };
+
+const DEFAULT_BROKERS: FeeEntry[] = [
+  { name: 'RHB',              buy: '0.19', sell: '0.29' },
+  { name: 'Ajaib',            buy: '0.10', sell: '0.20' },
+  { name: 'Stockbit',         buy: '0.10', sell: '0.20' },
+  { name: 'IPOT',             buy: '0.19', sell: '0.29' },
+  { name: 'Mirae',            buy: '0.18', sell: '0.28' },
+  { name: 'BIONS (BNI)',      buy: '0.17', sell: '0.27' },
+  { name: 'Phillip POEMS',    buy: '0.20', sell: '0.28' },
+  { name: 'Mandiri Online',   buy: '0.19', sell: '0.29' },
+];
+
+const STORAGE_KEY = 'stock_journal_fee_config';
+
+function loadBrokers(): FeeEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as FeeEntry[];
+  } catch {}
+  return DEFAULT_BROKERS;
+}
+
+function saveBrokers(list: FeeEntry[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
 
 export function SettingsPage() {
   const webhookUrl = 'https://coba4-stock-journal.vercel.app/api/webhook';
   const [copied, setCopied] = useState(false);
+  const [brokers, setBrokers] = useState<FeeEntry[]>(loadBrokers);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editBuf, setEditBuf] = useState<FeeEntry>({ name: '', buy: '', sell: '' });
+  const [adding, setAdding] = useState(false);
+  const [newBroker, setNewBroker] = useState<FeeEntry>({ name: '', buy: '', sell: '' });
+  const [saved, setSaved] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(webhookUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const startEdit = (i: number) => {
+    setEditing(i);
+    setEditBuf({ ...brokers[i] });
+  };
+
+  const saveEdit = () => {
+    if (editing === null) return;
+    const updated = brokers.map((b, i) => i === editing ? { ...editBuf } : b);
+    setBrokers(updated);
+    saveBrokers(updated);
+    setEditing(null);
+    flashSaved();
+  };
+
+  const cancelEdit = () => setEditing(null);
+
+  const deleteBroker = (i: number) => {
+    const updated = brokers.filter((_, idx) => idx !== i);
+    setBrokers(updated);
+    saveBrokers(updated);
+    flashSaved();
+  };
+
+  const addBroker = () => {
+    if (!newBroker.name.trim()) return;
+    const updated = [...brokers, { ...newBroker }];
+    setBrokers(updated);
+    saveBrokers(updated);
+    setNewBroker({ name: '', buy: '', sell: '' });
+    setAdding(false);
+    flashSaved();
+  };
+
+  const resetDefaults = () => {
+    setBrokers(DEFAULT_BROKERS);
+    saveBrokers(DEFAULT_BROKERS);
+    setEditing(null);
+    setAdding(false);
+    flashSaved();
+  };
+
+  const flashSaved = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const inputStyle = {
+    border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px',
+    fontSize: 13, fontFamily: 'inherit', color: 'var(--text-primary)',
+    background: 'var(--bg-white)', outline: 'none', width: '100%',
   };
 
   return (
@@ -469,18 +546,28 @@ export function SettingsPage() {
               </button>
             </div>
             <div style={{ marginTop: 14, padding: 12, background: 'var(--primary-light)', borderRadius: 10, display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'var(--primary)' }}>
-              <span style={{ minWidth: 16, marginTop: 1 }}>ℹ️</span>
-              <span>URL ini menerima <strong>POST request</strong> berisi payload JSON dari HP Android Anda. Buka di browser akan menampilkan pesan "Method not allowed" — itu normal.</span>
+              <span>ℹ️</span>
+              <span>URL ini menerima <strong>POST request</strong> dari HP Android. Membuka di browser akan muncul "Method not allowed" — itu normal.</span>
             </div>
           </div>
         </div>
 
-        {/* Fee Broker */}
+        {/* Fee Broker Editable */}
         <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="card-header">
             <div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>Konfigurasi Fee Broker</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Referensi fee per broker (dalam %)</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                Klik ✏️ pada baris untuk mengubah. Tambah sekuritas baru dengan tombol di bawah.
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {saved && (
+                <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 700 }}>✓ Tersimpan!</span>
+              )}
+              <button className="btn-secondary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={resetDefaults}>
+                Reset Default
+              </button>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -490,28 +577,129 @@ export function SettingsPage() {
                   <th>Sekuritas</th>
                   <th style={{ textAlign: 'right' }}>Fee Beli (%)</th>
                   <th style={{ textAlign: 'right' }}>Fee Jual (%)</th>
-                  <th>Keterangan</th>
+                  <th style={{ textAlign: 'center', width: 100 }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(DEFAULT_FEE_CONFIG).map(([broker, fee]) => (
-                  <tr key={broker}>
-                    <td style={{ fontWeight: 700, textTransform: 'capitalize' }}>{broker === 'ipot' ? 'IPOT' : broker === 'rhb' ? 'RHB' : broker.charAt(0).toUpperCase() + broker.slice(1)}</td>
+                {brokers.map((b, i) => editing === i ? (
+                  <tr key={i} style={{ background: 'var(--primary-light)' }}>
+                    <td>
+                      <input
+                        style={inputStyle}
+                        value={editBuf.name}
+                        onChange={e => setEditBuf(v => ({ ...v, name: e.target.value }))}
+                        placeholder="Nama sekuritas"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        style={{ ...inputStyle, textAlign: 'right' }}
+                        value={editBuf.buy}
+                        onChange={e => setEditBuf(v => ({ ...v, buy: e.target.value }))}
+                        placeholder="0.19"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        style={{ ...inputStyle, textAlign: 'right' }}
+                        value={editBuf.sell}
+                        onChange={e => setEditBuf(v => ({ ...v, sell: e.target.value }))}
+                        placeholder="0.29"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                      />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button onClick={saveEdit} style={{ background: 'var(--success)', color: 'white', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Simpan</button>
+                        <button onClick={cancelEdit} style={{ background: 'var(--border-light)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Batal</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={i}>
+                    <td style={{ fontWeight: 700 }}>{b.name}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <span className="badge badge-buy">{fee.buy}%</span>
+                      <span className="badge badge-buy">{b.buy}%</span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <span className="badge badge-sell">{fee.sell}%</span>
+                      <span className="badge badge-sell">{b.sell}%</span>
                     </td>
-                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>Estimasi — bisa berbeda sesuai promo</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button
+                          onClick={() => startEdit(i)}
+                          style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                        >✏️ Edit</button>
+                        <button
+                          onClick={() => deleteBroker(i)}
+                          style={{ background: 'var(--danger-light)', color: 'var(--danger)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                        >🗑️</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
+
+                {/* Add new broker row */}
+                {adding && (
+                  <tr style={{ background: '#F0FFF4' }}>
+                    <td>
+                      <input
+                        style={inputStyle}
+                        value={newBroker.name}
+                        onChange={e => setNewBroker(v => ({ ...v, name: e.target.value }))}
+                        placeholder="Nama sekuritas baru..."
+                        autoFocus
+                      />
+                    </td>
+                    <td>
+                      <input
+                        style={{ ...inputStyle, textAlign: 'right' }}
+                        value={newBroker.buy}
+                        onChange={e => setNewBroker(v => ({ ...v, buy: e.target.value }))}
+                        placeholder="0.19"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        style={{ ...inputStyle, textAlign: 'right' }}
+                        value={newBroker.sell}
+                        onChange={e => setNewBroker(v => ({ ...v, sell: e.target.value }))}
+                        placeholder="0.29"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                      />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button onClick={addBroker} style={{ background: 'var(--success)', color: 'white', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>+ Tambah</button>
+                        <button onClick={() => setAdding(false)} style={{ background: 'var(--border-light)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Batal</button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-          <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-light)', fontSize: 12, color: 'var(--text-muted)' }}>
-            Saat ini sistem menggunakan fee BUY 0.15% dan SELL 0.25% secara flat. Konfigurasi fee per broker akan tersedia di pembaruan berikutnya.
-          </div>
+          {!adding && (
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-light)' }}>
+              <button
+                className="btn-primary"
+                style={{ fontSize: 13 }}
+                onClick={() => { setAdding(true); setEditing(null); }}
+              >
+                + Tambah Sekuritas Baru
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sync Info */}
@@ -543,7 +731,7 @@ export function SettingsPage() {
               { label: 'Versi Aplikasi', value: 'v1.0.0' },
               { label: 'Hosting', value: 'Vercel (Free)' },
               { label: 'Database', value: 'Supabase PostgreSQL' },
-              { label: 'Broker Didukung', value: 'RHB, Ajaib, Stockbit, IPOT, +4 lainnya' },
+              { label: 'Broker Didukung', value: `${brokers.length} sekuritas terdaftar` },
             ].map(({ label, value }) => (
               <div key={label} className="settings-item">
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
@@ -557,3 +745,5 @@ export function SettingsPage() {
     </div>
   );
 }
+
+

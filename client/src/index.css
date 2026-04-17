@@ -576,26 +576,68 @@ body {
   }
 
   .page-content {
-    padding: 16px;
+    padding: 12px;
   }
 
   .topbar {
-    padding: 0 16px;
+    padding: 0 14px;
+    height: 56px;
+  }
+
+  .topbar-title {
+    font-size: 16px;
+  }
+
+  .topbar-sub {
+    display: none;
   }
 
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat-card {
+    padding: 14px;
   }
 
   .hero-card {
-    padding: 20px;
+    padding: 18px;
+    margin-bottom: 14px;
+    border-radius: var(--radius-xl);
+  }
+
+  .card-header {
+    padding: 14px 16px;
+  }
+
+  .card-body {
+    padding: 14px 16px;
+  }
+
+  .portfolio-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 }
 
 @media (max-width: 480px) {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .page-content {
+    padding: 10px;
+  }
+
+  .portfolio-grid {
+    grid-template-columns: 1fr;
   }
 }
 

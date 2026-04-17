@@ -134,24 +134,24 @@ export function DashboardPage({
 
       {/* Hero Card */}
       <div className="hero-card">
-        <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+        <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
           Total Realized P&L
         </p>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 20 }}>
-          <span style={{ fontSize: 40, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
+          <span style={{ fontSize: 'clamp(24px, 6vw, 40px)', fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
             {summary ? fmtCur(pnl) : '—'}
           </span>
           {summary && (
             <span style={{
               background: isProfit ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
               color: isProfit ? '#6EE7B7' : '#FCA5A5',
-              padding: '4px 10px', borderRadius: 99, fontSize: 12, fontWeight: 700, marginBottom: 6
+              padding: '3px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, marginBottom: 4
             }}>
               {isProfit ? '▲' : '▼'} {isProfit ? 'Cuan' : 'Rugi'}
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 20px' }}>
           {[
             { label: 'Total Beli', value: summary ? fmtCur(summary.buyValue) : '—' },
             { label: 'Total Jual', value: summary ? fmtCur(summary.sellValue) : '—' },
@@ -205,12 +205,12 @@ function StatCard({ title, value, accent, Icon }: { title: string; value: string
   return (
     <div className="stat-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</p>
-          <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, lineHeight: 1.2, wordBreak: 'break-all' }}>{value}</p>
+        <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+          <p style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1.3 }}>{title}</p>
+          <p style={{ fontSize: 'clamp(13px, 3.5vw, 18px)', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, lineHeight: 1.2, wordBreak: 'break-all' }}>{value}</p>
         </div>
-        <div style={{ background: iconBg, borderRadius: 10, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 10 }}>
-          <Icon size={18} color="white" />
+        <div style={{ background: iconBg, borderRadius: 10, width: 34, height: 34, minWidth: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={16} color="white" />
         </div>
       </div>
     </div>
@@ -522,7 +522,7 @@ export function SettingsPage() {
 
   return (
     <div className="page-content">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
 
         {/* Webhook Info */}
         <div className="card" style={{ gridColumn: '1 / -1' }}>

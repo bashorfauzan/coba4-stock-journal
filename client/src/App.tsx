@@ -149,14 +149,18 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans text-gray-900">
-      <main className="max-w-7xl mx-auto space-y-6">
+      <main className="max-w-7xl mx-auto space-y-6 lg:space-y-8">
         
-        <header className="flex justify-between items-end mb-4">
+        {/* Header Section */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight">Portofolio Saham</h1>
-            <p className="text-sm text-gray-500 mt-1">Dicatat otomatis dari broker</p>
+            <p className="text-sm font-semibold text-blue-600 mb-1 uppercase tracking-wider">Coba4 Stock Journal</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Portfolio Saham</h1>
+            <p className="text-gray-600 mt-2 max-w-2xl text-sm lg:text-base">
+              Pantau aset investasi, sejarah pencatatan posisi saham, serta riwayat beli & jual yang masuk secara otomatis.
+            </p>
           </div>
-        </header>
+        </div>
 
         {error && (
           <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 flex items-center gap-3">
@@ -166,155 +170,142 @@ function App() {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-4">
           <StatCard
             title="Transaksi Match"
             value={summary ? formatNumber(summary.transactions) : '...'}
             icon={CheckCircle2}
-            color="emerald"
+            iconBg="bg-emerald-500"
           />
           <StatCard
             title="Total Nilai Beli"
             value={summary ? formatCurrency(summary.buyValue) : '...'}
             icon={Wallet}
-            color="fuchsia"
+            iconBg="bg-purple-500"
           />
           <StatCard
             title="Total Nilai Jual"
             value={summary ? formatCurrency(summary.sellValue) : '...'}
             icon={Activity}
-            color="orange"
+            iconBg="bg-orange-500"
           />
         </div>
 
-        {/* Posisi Saham (Full Width) */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Posisi Saham</h2>
-              <p className="text-sm text-gray-500 mt-1">{positions.length} ticker tercatat aktif maupun tertutup</p>
-            </div>
-          </div>
+        <div className="w-full">
           
-          <div className="flex-1 overflow-x-auto p-4">
-            {positions.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-3 pb-12 pt-16">
-                <CandlestickChart className="w-12 h-12 text-gray-200" />
-                <p className="text-sm font-medium">Belum ada posisi.</p>
-                <p className="text-xs mt-1">Sistem akan mencatat saat notifikasi MATCHED masuk.</p>
+          {/* Posisi Saham */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
+            <div className="p-5 lg:p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Posisi Portofolio Anda</h2>
+                <p className="text-xs text-gray-500 mt-1">{positions.length} emiten tercatat dalam kepemilikan Anda</p>
               </div>
-            ) : (
-              <div className="min-w-[800px] border border-gray-100 rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/50">
-                      <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ticker</th>
-                      <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status / Lot</th>
-                      <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg Buy Price</th>
-                      <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Modal Beli</th>
-                      <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Total Jual</th>
-                      <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Update</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 text-sm">
-                    {positions.map((pos) => {
-                      const isClosed = pos.netLots === 0;
-                      return (
-                        <tr key={pos.ticker} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100">
-                                <span className="font-bold text-blue-700 text-sm">{pos.ticker.substring(0,2)}</span>
-                              </div>
-                              <span className="font-bold text-gray-900 text-base">{pos.ticker}</span>
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            {isClosed ? (
-                               <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md uppercase tracking-wide">Closed</span>
-                            ) : (
-                               <span className="font-bold text-gray-900 bg-green-50 text-green-700 border border-green-100 px-3 py-1 rounded-lg">Net {formatNumber(pos.netLots)} Lot</span>
-                            )}
-                          </td>
-                          <td className="py-4 px-6 font-medium text-gray-600">{formatCurrency(pos.avgBuyPrice)}</td>
-                          <td className="py-4 px-6 text-right font-bold text-fuchsia-600">
-                            {formatCurrency(pos.avgBuyPrice * pos.netLots * 100)}
-                          </td>
-                          <td className="py-4 px-6 text-right font-bold text-orange-600">
-                            {formatCurrency(pos.realizedSellValue)}
-                          </td>
-                          <td className="py-4 px-6">
-                            {pos.lastTradeAt && (
-                              <div className="flex items-center text-xs font-medium text-gray-500 gap-1.5">
-                                <Clock className="w-4 h-4" />
-                                {formatCompactDate(pos.lastTradeAt)}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            </div>
+            
+            <div className="overflow-y-auto flex-1 p-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-2">
+                {positions.length > 0 ? (
+                  positions.map((position) => (
+                    <div key={position.ticker} className="bg-white border border-gray-100 p-5 hover:border-blue-200 hover:shadow-md transition-all rounded-2xl flex flex-col justify-between">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center border border-blue-100/50 shadow-sm">
+                            <span className="font-bold text-blue-700 text-lg">{position.ticker.substring(0,2)}</span>
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-gray-900 text-lg tracking-tight">{position.ticker}</h4>
+                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3" /> {formatCompactDate(position.lastTradeAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold shadow-sm ${
+                            position.netLots >= 0 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                            {formatNumber(position.netLots)} Lot
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-50/80">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Beli / Jual</p>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {formatNumber(position.buyLots)} <span className="text-gray-300 font-light">/</span> {formatNumber(position.sellLots)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Avg. Price</p>
+                          <p className="text-sm font-bold text-gray-900">{formatCurrency(position.avgBuyPrice)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full p-10 text-center text-gray-500 flex flex-col items-center justify-center h-full">
+                    <CandlestickChart className="w-12 h-12 text-gray-300 mb-3" />
+                    <p className="text-base font-semibold text-gray-700">Portofolio Anda Masih Kosong.</p>
+                    <p className="text-sm mt-1 text-gray-500 max-w-sm">Transaksi saham yang tereksekusi akan otomatis membentuk portofolio Anda di sini.</p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
         {/* Riwayat Transaksi */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-5 lg:p-6 border-b border-gray-100 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Riwayat Transaksi</h2>
-              <p className="text-xs text-gray-500 mt-1">{transactions.length} pesanan MATCHED</p>
+              <h2 className="text-lg font-bold text-gray-900">Riwayat Transaksi</h2>
+              <p className="text-xs text-gray-500 mt-1">{transactions.length} transaksi tercatat</p>
             </div>
           </div>
           
-          <div className="overflow-x-auto p-4">
-            <div className="min-w-[800px] border border-gray-100 rounded-2xl overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/50 border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 font-semibold">
-                    <th className="p-4 pl-6 whitespace-nowrap">Waktu Transaksi</th>
-                    <th className="p-4">Ticker</th>
-                    <th className="p-4">Action</th>
-                    <th className="p-4 text-right">Lot</th>
-                    <th className="p-4 text-right">Harga</th>
-                    <th className="p-4 text-right hidden md:table-cell">Gross</th>
-                    <th className="p-4 text-right hidden md:table-cell">Fee Broker</th>
-                    <th className="p-4 pr-6 text-right">Nilai Akhir (Net)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 text-sm">
-                  {transactions.length > 0 ? (
-                    transactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="p-4 pl-6 font-medium text-gray-500 whitespace-nowrap">{formatDate(tx.tradedAt)}</td>
-                        <td className="p-4 font-bold text-gray-900">{tx.ticker}</td>
-                        <td className="p-4">
-                          <span className={`inline-flex px-3 py-1 rounded-md text-xs font-bold tracking-wide ${
-                            tx.side === 'BUY' ? 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100' : 'bg-orange-50 text-orange-700 border border-orange-100'
-                          }`}>
-                            {tx.side}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right font-bold text-gray-900">{formatNumber(tx.lot)}</td>
-                        <td className="p-4 text-right font-medium text-gray-600">{formatNumber(tx.pricePerShare)}</td>
-                        <td className="p-4 text-right text-gray-500 hidden md:table-cell">{formatCurrency(tx.grossValue)}</td>
-                        <td className="p-4 text-right text-gray-500 hidden md:table-cell">{formatCurrency(tx.brokerFee)}</td>
-                        <td className="p-4 pr-6 text-right font-black text-gray-900">{formatCurrency(tx.netValue)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="p-12 text-center text-gray-400 font-medium">
-                         Belum ada transkasi MATCHED yang tercatat.
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                  <th className="p-4 whitespace-nowrap">Waktu</th>
+                  <th className="p-4">Ticker</th>
+                  <th className="p-4">Tipe</th>
+                  <th className="p-4 text-right">Lot</th>
+                  <th className="p-4 text-right">Harga</th>
+                  <th className="p-4 text-right hidden md:table-cell">Gross</th>
+                  <th className="p-4 text-right hidden md:table-cell">Fee</th>
+                  <th className="p-4 text-right">Net Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {transactions.length > 0 ? (
+                  transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 text-gray-500 whitespace-nowrap">{formatDate(tx.tradedAt)}</td>
+                      <td className="p-4 font-bold text-gray-900">{tx.ticker}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex px-2 py-1 rounded-md text-xs font-bold leading-none ${
+                          tx.side === 'BUY' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {tx.side}
+                        </span>
                       </td>
+                      <td className="p-4 text-right font-medium text-gray-900">{formatNumber(tx.lot)}</td>
+                      <td className="p-4 text-right font-medium text-gray-900">{formatNumber(tx.pricePerShare)}</td>
+                      <td className="p-4 text-right text-gray-500 hidden md:table-cell">{formatCurrency(tx.grossValue)}</td>
+                      <td className="p-4 text-right text-gray-500 hidden md:table-cell">{formatCurrency(tx.brokerFee)}</td>
+                      <td className="p-4 text-right font-bold text-gray-900">{formatCurrency(tx.netValue)}</td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-gray-500">
+                      Belum ada riwayat transaksi.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 

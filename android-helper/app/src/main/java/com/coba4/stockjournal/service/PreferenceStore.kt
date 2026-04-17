@@ -52,10 +52,10 @@ class PreferenceStore(context: Context) {
         private const val KEY_LAST_DELIVERY_STATUS = "last_delivery_status"
         private const val KEY_WEB_APP_URL = "web_app_url"
         private const val KEY_LAST_WEB_APP_STATUS = "last_web_app_status"
-        private const val DEFAULT_WEBHOOK_URL = "http://192.168.0.109:5001/api/stock-webhook/notification"
+        private const val DEFAULT_WEBHOOK_URL = "https://coba4-stock-journal.vercel.app/api/webhook"
         private const val DEFAULT_FILTER_KEYWORDS = "rhb,stockbit,ajaib,ipot,phillip,philip,poems,semesta,most,bions,bcas,mirae,matched,open,buy,sell,stock,lot,price"
         private const val DEFAULT_DELIVERY_STATUS = "Belum ada pengiriman"
-        private const val DEFAULT_WEB_APP_URL = "http://192.168.0.109:5173"
+        private const val DEFAULT_WEB_APP_URL = "https://coba4-stock-journal.vercel.app"
         private const val DEFAULT_WEB_APP_STATUS = "Status Web App: belum dicoba"
 
         private fun copyIfMissing(target: android.content.SharedPreferences.Editor, key: String, value: Any?) {

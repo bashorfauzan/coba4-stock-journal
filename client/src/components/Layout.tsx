@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import {
   LayoutDashboard, PieChart, ClipboardList, Settings,
-  TrendingUp, TrendingDown, AlertCircle
+  TrendingUp, TrendingDown, AlertCircle, Rocket
 } from 'lucide-react';
 import type { StockSummary, StockPosition, StockTransaction } from '../api';
+import { AccountSection } from './IpoAccount';
+
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 const fmt = (v: number) => new Intl.NumberFormat('id-ID').format(v);
@@ -15,13 +17,14 @@ const fmtCompact = (v?: string | null) =>
   v ? new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '-';
 
 // ─── NAV ITEMS ───────────────────────────────────────────────────────────────
-export type PageId = 'dashboard' | 'portfolio' | 'transactions' | 'settings';
+export type PageId = 'dashboard' | 'portfolio' | 'transactions' | 'ipo' | 'settings';
 
 interface NavItemDef { id: PageId; label: string; Icon: any; }
 const NAV_ITEMS: NavItemDef[] = [
   { id: 'dashboard',    label: 'Dashboard',     Icon: LayoutDashboard },
   { id: 'portfolio',    label: 'Portofolio',    Icon: PieChart },
   { id: 'transactions', label: 'Transaksi',     Icon: ClipboardList },
+  { id: 'ipo',          label: 'IPO',           Icon: Rocket },
   { id: 'settings',     label: 'Pengaturan',    Icon: Settings },
 ];
 
@@ -86,7 +89,8 @@ const PAGE_TITLES: Record<PageId, { title: string; sub: string }> = {
   dashboard:    { title: 'Dashboard',           sub: 'Ringkasan portofolio investasi Anda' },
   portfolio:    { title: 'Portofolio',          sub: 'Saham yang sedang Anda pegang' },
   transactions: { title: 'Riwayat Transaksi',  sub: 'Semua transaksi BUY / SELL tercatat' },
-  settings:     { title: 'Pengaturan',          sub: 'Konfigurasi aplikasi & webhook' },
+  ipo:          { title: 'IPO',                 sub: 'Pencatatan pemesanan & hasil IPO saham' },
+  settings:     { title: 'Pengaturan',          sub: 'Konfigurasi aplikasi & akun' },
 };
 
 export function Topbar({ page, syncing }: { page: PageId; syncing: boolean }) {
@@ -523,6 +527,9 @@ export function SettingsPage() {
   return (
     <div className="page-content">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+
+        {/* Account Info */}
+        <AccountSection />
 
         {/* Webhook Info */}
         <div className="card" style={{ gridColumn: '1 / -1' }}>

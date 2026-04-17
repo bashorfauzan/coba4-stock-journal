@@ -6,6 +6,7 @@ import {
   DashboardPage, PortfolioPage, TransactionsPage, SettingsPage,
   type PageId
 } from './components/Layout';
+import { IpoPage } from './components/IpoAccount';
 
 function App() {
   const [page, setPage] = useState<PageId>('dashboard');
@@ -98,6 +99,7 @@ function App() {
         {page === 'dashboard'    && <DashboardPage    summary={summary} positions={positions} transactions={transactions} error={error} />}
         {page === 'portfolio'    && <PortfolioPage    positions={positions} />}
         {page === 'transactions' && <TransactionsPage transactions={transactions} />}
+        {page === 'ipo'          && <IpoPage />}
         {page === 'settings'     && <SettingsPage />}
       </div>
 

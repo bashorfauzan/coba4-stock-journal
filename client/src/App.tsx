@@ -44,22 +44,97 @@ function App() {
 
     const load = async () => {
       try {
-        const [summaryRes, positionsRes, transactionsRes, notificationsRes] = await Promise.all([
-          api.get<StockSummary>('/stocks/summary'),
-          api.get<StockPosition[]>('/stocks/positions'),
-          api.get<StockTransaction[]>('/stocks/transactions'),
-          api.get<StockNotification[]>('/stock-webhook/notifications')
-        ]);
+        const { supabase } = await import('./lib/supabase');
+        
+        // Ambil Data Transaksi
+        const { data: txData, error: txError } = await supabase
+          .from('StockTransaction')
+          .select('*')
+          .order('tradedAt', { ascending: false });
+
+        if (txError) throw txError;
+
+        // Ambil Data Notifikasi
+        const { data: notifData, error: notifError } = await supabase
+          .from('StockNotification')
+          .select('*')
+          .order('receivedAt', { ascending: false })
+          .limit(100);
+
+        if (notifError) throw notifError;
 
         if (!active) return;
 
-        setSummary(summaryRes.data);
-        setPositions(positionsRes.data);
-        setTransactions(transactionsRes.data);
-        setNotifications(notificationsRes.data);
+        const transactionsRes = (txData || []) as StockTransaction[];
+        const notificationsRes = (notifData || []) as StockNotification[];
+
+        // Hitung Summary secara lokal
+        const summaryCalc: StockSummary = {
+          notifications: notificationsRes.length, // Menampilkan yg dilimit/total dari Inbox
+          transactions: transactionsRes.length,
+          buyCount: 0,
+          sellCount: 0,
+          buyValue: 0,
+          sellValue: 0
+        };
+
+        transactionsRes.forEach((tx) => {
+          if (tx.status === 'MATCHED') {
+            if (tx.side === 'BUY') {
+              summaryCalc.buyValue += tx.netValue;
+              summaryCalc.buyCount += 1;
+            } else {
+              summaryCalc.sellValue += tx.netValue;
+              summaryCalc.sellCount += 1;
+            }
+          }
+        });
+
+        // Hitung Posisi secara lokal (dari yang terlama ke terbaru)
+        const matchedTxs = [...transactionsRes]
+          .filter(t => t.status === 'MATCHED')
+          .sort((a, b) => new Date(a.tradedAt).getTime() - new Date(b.tradedAt).getTime());
+          
+        const positionsMap = new Map<string, StockPosition>();
+
+        for (const transaction of matchedTxs) {
+          const current = positionsMap.get(transaction.ticker) ?? {
+             ticker: transaction.ticker,
+             netLots: 0,
+             buyLots: 0,
+             sellLots: 0,
+             avgBuyPrice: 0,
+             realizedSellValue: 0,
+             lastTradeAt: null
+          };
+
+          if (transaction.side === 'BUY') {
+            const currentCost = current.avgBuyPrice * current.netLots;
+            const incomingCost = transaction.pricePerShare * transaction.lot;
+            const nextLots = current.netLots + transaction.lot;
+            current.avgBuyPrice = nextLots > 0 ? (currentCost + incomingCost) / nextLots : 0;
+            current.buyLots += transaction.lot;
+            current.netLots = nextLots;
+          } else {
+            current.sellLots += transaction.lot;
+            current.netLots -= transaction.lot;
+            current.realizedSellValue += transaction.netValue;
+          }
+
+          current.lastTradeAt = transaction.tradedAt;
+          positionsMap.set(transaction.ticker, current);
+        }
+
+        const positionsCalc = Array.from(positionsMap.values()).sort((a, b) => a.ticker.localeCompare(b.ticker));
+
+        setTransactions(transactionsRes);
+        setNotifications(notificationsRes);
+        setSummary(summaryCalc);
+        setPositions(positionsCalc);
+        setError(null);
       } catch (loadError: any) {
         if (!active) return;
-        setError(loadError?.response?.data?.error || 'Gagal memuat dashboard saham');
+        setError(loadError?.message || 'Gagal memuat dashboard saham dari Supabase');
       }
     };
 
@@ -86,8 +161,8 @@ function App() {
             </p>
           </div>
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex-shrink-0">
-            <p className="text-xs text-gray-500 font-medium mb-1">Webhook Endpoint</p>
-            <code className="text-sm text-blue-700 bg-blue-50 px-2 py-1 rounded font-mono">POST /api/stock-webhook/notification</code>
+            <p className="text-xs text-gray-500 font-medium mb-1">Webhook Endpoint (Vercel)</p>
+            <code className="text-sm text-blue-700 bg-blue-50 px-2 py-1 rounded font-mono">POST /api/webhook</code>
           </div>
         </div>
 

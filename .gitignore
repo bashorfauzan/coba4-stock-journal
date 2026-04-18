@@ -6,3 +6,10 @@ server/dev.db-journal
 server/.env
 client/node_modules
 server/node_modules
+
+# Android build artifacts
+android-helper/.gradle/
+android-helper/app/build/
+android-helper/build/
+android-helper/.kotlin/
+android-helper/local.properties

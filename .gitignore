@@ -12,4 +12,5 @@ android-helper/.gradle/
 android-helper/app/build/
 android-helper/build/
 android-helper/.kotlin/
+android-helper/.idea/
 android-helper/local.properties

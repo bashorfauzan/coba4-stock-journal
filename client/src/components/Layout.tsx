@@ -369,54 +369,53 @@ export function TransactionsPage({ transactions }: { transactions: StockTransact
   return (
     <div className="page-content">
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-bar" style={{ flex: '1 1 200px', minWidth: 160, position: 'relative' }}>
           <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--text-muted)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
           <input className="input-field" style={{ paddingLeft: 38, width: '100%' }} placeholder="Cari ticker atau broker..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['ALL', 'BUY', 'SELL'] as const).map(s => (
             <button key={s} onClick={() => setFilterSide(s)} style={{
-              padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)',
               fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
               background: filterSide === s ? (s === 'BUY' ? 'var(--success)' : s === 'SELL' ? 'var(--danger)' : 'var(--primary)') : 'var(--bg-white)',
               color: filterSide === s ? 'white' : 'var(--text-secondary)',
-              transition: 'all 0.15s',
+              transition: 'all 0.15s', whiteSpace: 'nowrap',
             }}>{s === 'ALL' ? 'Semua' : s}</button>
           ))}
           {(['ALL', 'BROKER', 'IPO'] as const).map(s => (
             <button key={s} onClick={() => setFilterSource(s)} style={{
-              padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)',
               fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
               background: filterSource === s ? (s === 'IPO' ? '#7C3AED' : s === 'BROKER' ? 'var(--primary)' : 'var(--text-secondary)') : 'var(--bg-white)',
               color: filterSource === s ? 'white' : 'var(--text-secondary)',
-              transition: 'all 0.15s',
+              transition: 'all 0.15s', whiteSpace: 'nowrap',
             }}>{s === 'ALL' ? 'Sumber' : s}</button>
           ))}
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Riwayat Transaksi</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{filtered.length} transaksi ditemukan</div>
-          </div>
-        </div>
+      {/* Header info */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          {filtered.length > 0
-            ? <CombinedTransactionTable txs={filtered} />
-            : (
-              <div className="empty-state">
-                <ClipboardList size={40} style={{ opacity: 0.2, marginBottom: 10 }} />
-                <p style={{ fontWeight: 700, fontSize: 14 }}>Tidak ada transaksi</p>
-              </div>
-            )
-          }
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Riwayat Transaksi</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{filtered.length} transaksi ditemukan</div>
         </div>
       </div>
+
+      {/* Card Grid */}
+      {filtered.length > 0
+        ? <CombinedTransactionTable txs={filtered} />
+        : (
+          <div className="empty-state">
+            <ClipboardList size={40} style={{ opacity: 0.2, marginBottom: 10 }} />
+            <p style={{ fontWeight: 700, fontSize: 14 }}>Tidak ada transaksi</p>
+          </div>
+        )
+      }
     </div>
   );
 }

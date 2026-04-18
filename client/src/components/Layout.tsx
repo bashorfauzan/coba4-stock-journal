@@ -12,8 +12,7 @@ import type { IpoTransaction } from './IpoAccount';
 const fmt = (v: number) => new Intl.NumberFormat('id-ID').format(v);
 const fmtCur = (v: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
-const fmtDate = (v?: string | null) =>
-  v ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(v)) : '-';
+
 const fmtCompact = (v?: string | null) =>
   v ? new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '-';
 
@@ -539,7 +538,7 @@ function CombinedTransactionTable({ txs }: { txs: CombinedTxType[] }) {
 export function SettingsPage() {
   const webhookUrl = 'https://coba4-stock-journal.vercel.app/api/webhook';
   const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false);
+
 
   const handleCopy = () => {
     navigator.clipboard.writeText(webhookUrl);
@@ -547,10 +546,7 @@ export function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const flashSaved = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+
 
   return (
     <div className="page-content">

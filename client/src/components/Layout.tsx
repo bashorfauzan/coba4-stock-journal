@@ -186,7 +186,7 @@ export function DashboardPage({
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>5 transaksi terakhir</div>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div>
           <TransactionTable transactions={transactions.slice(0, 5)} />
         </div>
       </div>
@@ -381,7 +381,7 @@ export function TransactionsPage({ transactions }: { transactions: StockTransact
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{filtered.length} transaksi ditemukan</div>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div>
           {filtered.length > 0
             ? <TransactionTable transactions={filtered} showBroker />
             : (
@@ -399,32 +399,41 @@ export function TransactionsPage({ transactions }: { transactions: StockTransact
 
 function TransactionTable({ transactions, showBroker = false }: { transactions: StockTransaction[]; showBroker?: boolean }) {
   return (
-    <table className="styled-table">
-      <thead>
-        <tr>
-          <th>Waktu</th>
-          <th>Ticker</th>
-          {showBroker && <th>Broker</th>}
-          <th>Tipe</th>
-          <th style={{ textAlign: 'right' }}>Lot</th>
-          <th style={{ textAlign: 'right' }}>Harga</th>
-          <th style={{ textAlign: 'right' }}>Net Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        {transactions.map(tx => (
-          <tr key={tx.id}>
-            <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(tx.tradedAt)}</td>
-            <td style={{ fontWeight: 800, letterSpacing: -0.3 }}>{tx.ticker}</td>
-            {showBroker && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{tx.sourceApp ?? '-'}</td>}
-            <td><span className={`badge ${tx.side === 'BUY' ? 'badge-buy' : 'badge-sell'}`}>{tx.side}</span></td>
-            <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(tx.lot)}</td>
-            <td style={{ textAlign: 'right' }}>{fmt(tx.pricePerShare)}</td>
-            <td style={{ textAlign: 'right', fontWeight: 800 }}>{fmtCur(tx.netValue)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16, padding: '16px' }}>
+      {transactions.map(tx => (
+        <div key={tx.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 16, background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {tx.ticker}
+                <span className={`badge ${tx.side === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ fontSize: 10, padding: '3px 8px' }}>{tx.side}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+                {fmtCompact(tx.tradedAt)}
+                {showBroker && tx.sourceApp ? ` • ${tx.sourceApp}` : ''}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: tx.side === 'BUY' ? 'var(--text-primary)' : 'var(--success)', letterSpacing: -0.5 }}>
+                {tx.side === 'BUY' ? `-${fmtCur(tx.netValue)}` : `+${fmtCur(tx.netValue)}`}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontWeight: 600 }}>Total (Net)</div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-white)', padding: '12px 14px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Lot Transaksi</div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{fmt(tx.lot)} <span style={{fontSize: 12, fontWeight: 600, color: 'var(--text-muted)'}}>Lot</span></div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Harga Satuan</div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{fmt(tx.pricePerShare)}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

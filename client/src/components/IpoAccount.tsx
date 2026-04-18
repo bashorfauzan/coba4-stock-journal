@@ -100,53 +100,70 @@ export function IpoPage() {
             <p style={{ fontSize: 12, marginTop: 4 }}>Klik "+ Tambah IPO" untuk mulai mencatat</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="styled-table">
-              <thead>
-                <tr>
-                  <th>Emiten</th>
-                  <th>Pemilik</th>
-                  <th>Broker</th>
-                  <th style={{ textAlign: 'right' }}>Harga IPO</th>
-                  <th style={{ textAlign: 'right' }}>Pesan</th>
-                  <th style={{ textAlign: 'right' }}>Jatah</th>
-                  <th style={{ textAlign: 'right' }}>Harga Jual</th>
-                  <th style={{ textAlign: 'right' }}>P&L</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'center' }}>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map(e => {
-                  const profit = pnl(e);
-                  const isPro = (profit ?? 0) >= 0;
-                  const s = STATUS_LABELS[e.status];
-                  return (
-                    <tr key={e.id}>
-                      <td style={{ fontWeight: 800 }}>{e.emiten}</td>
-                      <td style={{ fontSize: 12 }}>{e.pemilik || '-'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.broker}</td>
-                      <td style={{ textAlign: 'right' }}>{e.hargaIpo ? fmt2(e.hargaIpo) : '-'}</td>
-                      <td style={{ textAlign: 'right' }}>{e.lotPesan ? fmt2(e.lotPesan) : '-'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{e.lotJatah ? fmt2(e.lotJatah) : <span style={{ color: 'var(--text-muted)' }}>-</span>}</td>
-                      <td style={{ textAlign: 'right' }}>{e.hargaJual ? fmt2(e.hargaJual) : '-'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 800, color: profit !== null ? (isPro ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)' }}>
-                        {profit !== null ? `${isPro ? '+' : ''}${fmtCur2(profit)}` : '-'}
-                      </td>
-                      <td>
-                        <span style={{ fontSize: 11, fontWeight: 700, background: s.bg, color: s.color, padding: '3px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>{s.label}</span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          <button onClick={() => openEdit(e)} style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>Edit</button>
-                          <button onClick={() => del(e.id)} style={{ background: 'var(--danger-light)', color: 'var(--danger)', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>Hapus</button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, padding: 16 }}>
+            {list.map(e => {
+              const profit = pnl(e);
+              const isPro = (profit ?? 0) >= 0;
+              const s = STATUS_LABELS[e.status];
+              const nilaiPesan = e.hargaIpo * e.lotPesan * 100;
+              const nilaiJatah = e.hargaIpo * e.lotJatah * 100;
+
+              return (
+                <div key={e.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 16, background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {e.emiten}
+                        <span style={{ fontSize: 10, fontWeight: 700, background: s.bg, color: s.color, padding: '3px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>{s.label}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                        {e.pemilik ? `${e.pemilik} • ` : ''}{e.broker}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 8, flex: 1 }}>
+                    {/* Nilai Pesan */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, background: 'var(--bg-white)', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                      <span style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>Pemesanan <br/> <strong style={{color: 'var(--text-primary)'}}>{fmt2(e.lotPesan)} Lot @ {fmt2(e.hargaIpo)}</strong></span>
+                      <div style={{ textAlign: 'right', lineHeight: 1.4 }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Total Modal</span><br/>
+                        <span style={{ fontWeight: 800 }}>{nilaiPesan > 0 ? fmtCur2(nilaiPesan) : '-'}</span>
+                      </div>
+                    </div>
+
+                    {/* Nilai Jatah */}
+                    {(e.status === 'JATAH' || e.status === 'LISTING' || e.status === 'JUAL') && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, background: 'var(--bg-white)', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                        <span style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>Penjatahan <br/> <strong style={{color: 'var(--text-primary)'}}>{fmt2(e.lotJatah)} Lot</strong></span>
+                        <div style={{ textAlign: 'right', lineHeight: 1.4 }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Total Nilai</span><br/>
+                          <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{nilaiJatah > 0 ? fmtCur2(nilaiJatah) : '-'}</span>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    )}
+
+                    {/* Harga Jual & PnL */}
+                    {e.status === 'JUAL' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, background: 'var(--bg-white)', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                        <span style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>Terjual <br/> <strong style={{color: 'var(--text-primary)'}}>@ {fmt2(e.hargaJual)}</strong></span>
+                        <div style={{ textAlign: 'right', lineHeight: 1.4 }}>
+                          <span style={{ color: 'var(--text-muted)' }}>P&L</span><br/>
+                          <span style={{ fontWeight: 800, color: profit !== null ? (isPro ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)' }}>
+                            {profit !== null ? `${isPro ? '+' : ''}${fmtCur2(profit)}` : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
+                    <button onClick={() => openEdit(e)} style={{ flex: 1, background: 'var(--primary-light)', color: 'var(--primary)', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>✏️ Edit</button>
+                    <button onClick={() => del(e.id)} style={{ background: 'var(--danger-light)', color: 'var(--danger)', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>🗑️</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

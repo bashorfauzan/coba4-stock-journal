@@ -4,7 +4,8 @@ import {
   TrendingUp, TrendingDown, AlertCircle, Rocket
 } from 'lucide-react';
 import type { StockSummary, StockPosition, StockTransaction } from '../api';
-import { AccountSection } from './IpoAccount';
+import { AccountSection, loadIpoTransactions } from './IpoAccount';
+import type { IpoTransaction } from './IpoAccount';
 
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -343,13 +344,28 @@ function PositionCard({ pos }: { pos: StockPosition }) {
 export function TransactionsPage({ transactions }: { transactions: StockTransaction[] }) {
   const [search, setSearch] = useState('');
   const [filterSide, setFilterSide] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
+  const [filterSource, setFilterSource] = useState<'ALL' | 'BROKER' | 'IPO'>('ALL');
 
-  const filtered = transactions.filter(tx => {
-    const matchSearch = tx.ticker.toLowerCase().includes(search.toLowerCase()) ||
-      (tx.sourceApp ?? '').toLowerCase().includes(search.toLowerCase());
-    const matchSide = filterSide === 'ALL' || tx.side === filterSide;
-    return matchSearch && matchSide;
+  const ipoTxs = loadIpoTransactions();
+
+  const brokerTxs: CombinedTxType[] = transactions.map(t => ({ ...t, _source: 'BROKER' as const }));
+  const ipoTxsCombined: CombinedTxType[] = ipoTxs.map(t => ({ ...t, _source: 'IPO' as const }));
+
+  const allTxs: CombinedTxType[] = [...brokerTxs, ...ipoTxsCombined].sort((a, b) => {
+    const aTime = a._source === 'BROKER' ? a.tradedAt : a.createdAt;
+    const bTime = b._source === 'BROKER' ? b.tradedAt : b.createdAt;
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
+
+  const filtered = allTxs.filter(tx => {
+    const source = tx._source === 'BROKER' ? (tx.sourceApp ?? '') : `IPO - ${tx.broker}`;
+    const matchSearch = tx.ticker.toLowerCase().includes(search.toLowerCase()) ||
+      source.toLowerCase().includes(search.toLowerCase());
+    const matchSide = filterSide === 'ALL' || tx.side === filterSide;
+    const matchSource = filterSource === 'ALL' || tx._source === filterSource;
+    return matchSearch && matchSide && matchSource;
+  });
+
 
   return (
     <div className="page-content">
@@ -371,6 +387,15 @@ export function TransactionsPage({ transactions }: { transactions: StockTransact
               transition: 'all 0.15s',
             }}>{s === 'ALL' ? 'Semua' : s}</button>
           ))}
+          {(['ALL', 'BROKER', 'IPO'] as const).map(s => (
+            <button key={s} onClick={() => setFilterSource(s)} style={{
+              padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              background: filterSource === s ? (s === 'IPO' ? '#7C3AED' : s === 'BROKER' ? 'var(--primary)' : 'var(--text-secondary)') : 'var(--bg-white)',
+              color: filterSource === s ? 'white' : 'var(--text-secondary)',
+              transition: 'all 0.15s',
+            }}>{s === 'ALL' ? 'Sumber' : s}</button>
+          ))}
         </div>
       </div>
 
@@ -383,7 +408,7 @@ export function TransactionsPage({ transactions }: { transactions: StockTransact
         </div>
         <div>
           {filtered.length > 0
-            ? <TransactionTable transactions={filtered} showBroker />
+            ? <CombinedTransactionTable txs={filtered} />
             : (
               <div className="empty-state">
                 <ClipboardList size={40} style={{ opacity: 0.2, marginBottom: 10 }} />
@@ -437,42 +462,83 @@ function TransactionTable({ transactions, showBroker = false }: { transactions: 
   );
 }
 
-// ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
-type FeeEntry = { name: string; buy: string; sell: string };
+type CombinedTxType =
+  | (StockTransaction & { _source: 'BROKER' })
+  | (IpoTransaction & { _source: 'IPO' });
 
-const DEFAULT_BROKERS: FeeEntry[] = [
-  { name: 'RHB',              buy: '0.19', sell: '0.29' },
-  { name: 'Ajaib',            buy: '0.10', sell: '0.20' },
-  { name: 'Stockbit',         buy: '0.10', sell: '0.20' },
-  { name: 'IPOT',             buy: '0.19', sell: '0.29' },
-  { name: 'Mirae',            buy: '0.18', sell: '0.28' },
-  { name: 'BIONS (BNI)',      buy: '0.17', sell: '0.27' },
-  { name: 'Phillip POEMS',    buy: '0.20', sell: '0.28' },
-  { name: 'Mandiri Online',   buy: '0.19', sell: '0.29' },
-];
+function CombinedTransactionTable({ txs }: { txs: CombinedTxType[] }) {
+  const fmtC = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
+  const fmtN = (v: number) => new Intl.NumberFormat('id-ID').format(v);
+  const fmtD = (v?: string | null) =>
+    v ? new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(v)) : '-';
 
-const STORAGE_KEY = 'stock_journal_fee_config';
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16, padding: '16px' }}>
+      {txs.map(tx => {
+        const isIpo = tx._source === 'IPO';
+        const ipoTx = isIpo ? (tx as IpoTransaction) : null;
+        const brokerTx = !isIpo ? (tx as StockTransaction) : null;
+        const ticker = tx.ticker ?? '-';
+        const side = tx.side;
+        const lot = isIpo ? ipoTx!.lot : brokerTx!.lot;
+        const harga = isIpo ? ipoTx!.hargaPerLembar : brokerTx!.pricePerShare;
+        const netVal = isIpo ? ipoTx!.nilaiTotal : brokerTx!.netValue;
+        const timeStr = isIpo ? ipoTx!.createdAt : brokerTx!.tradedAt;
+        const source = isIpo
+          ? `${ipoTx!.broker} (${ipoTx!.pemilik})`
+          : (brokerTx!.sourceApp ?? '');
+        const hasFee = isIpo && side === 'SELL' && ipoTx!.feePersen > 0;
+        const netLabel = isIpo
+          ? (side === 'BUY' ? 'Tanpa Fee (IPO)' : 'Net (setelah fee)')
+          : 'Total (Net)';
 
-function loadBrokers(): FeeEntry[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as FeeEntry[];
-  } catch {}
-  return DEFAULT_BROKERS;
+        return (
+          <div key={tx.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 16, background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', transition: 'all 0.2s', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {ticker}
+                  <span className={`badge ${side === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ fontSize: 10, padding: '3px 8px' }}>{side}</span>
+                  {isIpo && <span style={{ fontSize: 9, fontWeight: 800, background: '#EDE9FE', color: '#7C3AED', padding: '2px 7px', borderRadius: 99, whiteSpace: 'nowrap' }}>IPO</span>}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {fmtD(timeStr)}{source ? ` • ${source}` : ''}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: side === 'BUY' ? 'var(--text-primary)' : 'var(--success)', letterSpacing: -0.5 }}>
+                  {side === 'BUY' ? `-${fmtC(netVal)}` : `+${fmtC(netVal)}`}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontWeight: 600 }}>{netLabel}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-white)', padding: '12px 14px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Lot</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtN(lot)} <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Lot</span></div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Harga Satuan</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtN(harga)}</div>
+              </div>
+            </div>
+            {hasFee && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '8px 12px', background: 'var(--danger-light)', borderRadius: 8, fontSize: 12 }}>
+                <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Fee Jual ({ipoTx!.feePersen}%)</span>
+                <span style={{ color: 'var(--danger)', fontWeight: 800 }}>-{fmtC(ipoTx!.feeAmount)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
-function saveBrokers(list: FeeEntry[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-}
 
 export function SettingsPage() {
   const webhookUrl = 'https://coba4-stock-journal.vercel.app/api/webhook';
   const [copied, setCopied] = useState(false);
-  const [brokers, setBrokers] = useState<FeeEntry[]>(loadBrokers);
-  const [editing, setEditing] = useState<number | null>(null);
-  const [editBuf, setEditBuf] = useState<FeeEntry>({ name: '', buy: '', sell: '' });
-  const [adding, setAdding] = useState(false);
-  const [newBroker, setNewBroker] = useState<FeeEntry>({ name: '', buy: '', sell: '' });
   const [saved, setSaved] = useState(false);
 
   const handleCopy = () => {
@@ -481,56 +547,9 @@ export function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const startEdit = (i: number) => {
-    setEditing(i);
-    setEditBuf({ ...brokers[i] });
-  };
-
-  const saveEdit = () => {
-    if (editing === null) return;
-    const updated = brokers.map((b, i) => i === editing ? { ...editBuf } : b);
-    setBrokers(updated);
-    saveBrokers(updated);
-    setEditing(null);
-    flashSaved();
-  };
-
-  const cancelEdit = () => setEditing(null);
-
-  const deleteBroker = (i: number) => {
-    const updated = brokers.filter((_, idx) => idx !== i);
-    setBrokers(updated);
-    saveBrokers(updated);
-    flashSaved();
-  };
-
-  const addBroker = () => {
-    if (!newBroker.name.trim()) return;
-    const updated = [...brokers, { ...newBroker }];
-    setBrokers(updated);
-    saveBrokers(updated);
-    setNewBroker({ name: '', buy: '', sell: '' });
-    setAdding(false);
-    flashSaved();
-  };
-
-  const resetDefaults = () => {
-    setBrokers(DEFAULT_BROKERS);
-    saveBrokers(DEFAULT_BROKERS);
-    setEditing(null);
-    setAdding(false);
-    flashSaved();
-  };
-
   const flashSaved = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const inputStyle = {
-    border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px',
-    fontSize: 13, fontFamily: 'inherit', color: 'var(--text-primary)',
-    background: 'var(--bg-white)', outline: 'none', width: '100%',
   };
 
   return (
@@ -568,156 +587,6 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {/* Fee Broker Editable */}
-        <div className="card" style={{ gridColumn: '1 / -1' }}>
-          <div className="card-header">
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Konfigurasi Fee Broker</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                Klik ✏️ pada baris untuk mengubah. Tambah sekuritas baru dengan tombol di bawah.
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {saved && (
-                <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 700 }}>✓ Tersimpan!</span>
-              )}
-              <button className="btn-secondary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={resetDefaults}>
-                Reset Default
-              </button>
-            </div>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="styled-table">
-              <thead>
-                <tr>
-                  <th>Sekuritas</th>
-                  <th style={{ textAlign: 'right' }}>Fee Beli (%)</th>
-                  <th style={{ textAlign: 'right' }}>Fee Jual (%)</th>
-                  <th style={{ textAlign: 'center', width: 100 }}>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {brokers.map((b, i) => editing === i ? (
-                  <tr key={i} style={{ background: 'var(--primary-light)' }}>
-                    <td>
-                      <input
-                        style={inputStyle}
-                        value={editBuf.name}
-                        onChange={e => setEditBuf(v => ({ ...v, name: e.target.value }))}
-                        placeholder="Nama sekuritas"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        style={{ ...inputStyle, textAlign: 'right' }}
-                        value={editBuf.buy}
-                        onChange={e => setEditBuf(v => ({ ...v, buy: e.target.value }))}
-                        placeholder="0.19"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        style={{ ...inputStyle, textAlign: 'right' }}
-                        value={editBuf.sell}
-                        onChange={e => setEditBuf(v => ({ ...v, sell: e.target.value }))}
-                        placeholder="0.29"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                      />
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button onClick={saveEdit} style={{ background: 'var(--success)', color: 'white', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Simpan</button>
-                        <button onClick={cancelEdit} style={{ background: 'var(--border-light)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Batal</button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={i}>
-                    <td style={{ fontWeight: 700 }}>{b.name}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className="badge badge-buy">{b.buy}%</span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className="badge badge-sell">{b.sell}%</span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button
-                          onClick={() => startEdit(i)}
-                          style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                        >✏️ Edit</button>
-                        <button
-                          onClick={() => deleteBroker(i)}
-                          style={{ background: 'var(--danger-light)', color: 'var(--danger)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                        >🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-
-                {/* Add new broker row */}
-                {adding && (
-                  <tr style={{ background: '#F0FFF4' }}>
-                    <td>
-                      <input
-                        style={inputStyle}
-                        value={newBroker.name}
-                        onChange={e => setNewBroker(v => ({ ...v, name: e.target.value }))}
-                        placeholder="Nama sekuritas baru..."
-                        autoFocus
-                      />
-                    </td>
-                    <td>
-                      <input
-                        style={{ ...inputStyle, textAlign: 'right' }}
-                        value={newBroker.buy}
-                        onChange={e => setNewBroker(v => ({ ...v, buy: e.target.value }))}
-                        placeholder="0.19"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        style={{ ...inputStyle, textAlign: 'right' }}
-                        value={newBroker.sell}
-                        onChange={e => setNewBroker(v => ({ ...v, sell: e.target.value }))}
-                        placeholder="0.29"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                      />
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button onClick={addBroker} style={{ background: 'var(--success)', color: 'white', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>+ Tambah</button>
-                        <button onClick={() => setAdding(false)} style={{ background: 'var(--border-light)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Batal</button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {!adding && (
-            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-light)' }}>
-              <button
-                className="btn-primary"
-                style={{ fontSize: 13 }}
-                onClick={() => { setAdding(true); setEditing(null); }}
-              >
-                + Tambah Sekuritas Baru
-              </button>
-            </div>
-          )}
-        </div>
-
         {/* Sync Info */}
         <div className="card">
           <div className="card-header"><div style={{ fontWeight: 700, fontSize: 15 }}>Auto Sync</div></div>
@@ -747,7 +616,6 @@ export function SettingsPage() {
               { label: 'Versi Aplikasi', value: 'v1.0.0' },
               { label: 'Hosting', value: 'Vercel (Free)' },
               { label: 'Database', value: 'Supabase PostgreSQL' },
-              { label: 'Broker Didukung', value: `${brokers.length} sekuritas terdaftar` },
             ].map(({ label, value }) => (
               <div key={label} className="settings-item">
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>

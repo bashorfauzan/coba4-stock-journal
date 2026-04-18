@@ -9,13 +9,52 @@ const fmtCur2 = (v: number) =>
 type IpoStatus = 'PESAN' | 'JATAH' | 'LISTING' | 'JUAL' | 'TIDAK_JATAH';
 type IpoEntry = {
   id: string; emiten: string; hargaIpo: number; lotPesan: number; lotJatah: number;
-  hargaJual: number; tanggalPesan: string; tanggalListing: string;
+  hargaJual: number;
   status: IpoStatus; broker: string; pemilik: string; catatan: string;
 };
 
+type AccountEntry = { 
+  id: string; 
+  nama: string; 
+  rdn: string; 
+  broker: string; 
+  saldo: number; 
+  catatan: string;
+  feeBeli: number;
+  feeJual: number;
+};
+
 const IPO_KEY = 'stock_journal_ipo';
+const ACCOUNT_KEY = 'stock_journal_accounts';
+
 const loadIpo = (): IpoEntry[] => { try { const r = localStorage.getItem(IPO_KEY); if (r) return JSON.parse(r); } catch {} return []; };
 const saveIpoData = (l: IpoEntry[]) => localStorage.setItem(IPO_KEY, JSON.stringify(l));
+const loadAccounts = (): AccountEntry[] => { try { const r = localStorage.getItem(ACCOUNT_KEY); if (r) return JSON.parse(r); } catch {} return []; };
+const saveAccountsData = (l: AccountEntry[]) => localStorage.setItem(ACCOUNT_KEY, JSON.stringify(l));
+
+// ─── IPO TRANSACTIONS ─────────────────────────────────────────────────────────
+export type IpoTransaction = {
+  id: string;
+  ipoId: string;
+  ticker: string;
+  side: 'BUY' | 'SELL';
+  lot: number;
+  hargaPerLembar: number;
+  nilaiKotor: number;   // harga × lot × 100
+  feePersen: number;    // 0 untuk BUY, feeJual akun untuk SELL
+  feeAmount: number;
+  nilaiTotal: number;   // nilaiKotor - feeAmount (net)
+  broker: string;
+  pemilik: string;
+  createdAt: string;
+};
+
+const IPO_TX_KEY = 'stock_journal_ipo_transactions';
+export const loadIpoTransactions = (): IpoTransaction[] => {
+  try { const r = localStorage.getItem(IPO_TX_KEY); if (r) return JSON.parse(r); } catch {}
+  return [];
+};
+const saveIpoTransactions = (l: IpoTransaction[]) => localStorage.setItem(IPO_TX_KEY, JSON.stringify(l));
 
 const STATUS_LABELS: Record<IpoStatus, { label: string; color: string; bg: string }> = {
   PESAN:       { label: 'Dipesan',      color: '#7C3AED', bg: '#EDE9FE' },
@@ -27,7 +66,7 @@ const STATUS_LABELS: Record<IpoStatus, { label: string; color: string; bg: strin
 
 const EMPTY_IPO: Omit<IpoEntry, 'id'> = {
   emiten: '', hargaIpo: 0, lotPesan: 0, lotJatah: 0, hargaJual: 0,
-  tanggalPesan: '', tanggalListing: '', status: 'PESAN', broker: 'RHB', pemilik: '', catatan: ''
+  status: 'PESAN', broker: 'RHB', pemilik: '', catatan: ''
 };
 
 export function IpoPage() {
@@ -40,9 +79,106 @@ export function IpoPage() {
   const openEdit = (e: IpoEntry) => { setForm({ ...e }); setEditing(e); setShowForm(true); };
 
   const save = () => {
+    const prevEntry = editing ? list.find(i => i.id === editing.id) : null;
+    const entryId = editing?.id ?? Date.now().toString();
+    const newEntry: IpoEntry = { ...form, id: entryId };
+
+    // ── Logika bisnis: Status → JATAH ──────────────────────────────────────────
+    if (form.status === 'JATAH' && prevEntry?.status !== 'JATAH' && form.lotJatah > 0) {
+      // 1. Buat transaksi BUY IPO (tanpa fee)
+      const existingTx = loadIpoTransactions();
+      const alreadyBought = existingTx.some(t => t.ipoId === entryId && t.side === 'BUY');
+      if (!alreadyBought) {
+        const nilaiKotorBuy = form.hargaIpo * form.lotJatah * 100;
+        const buyTx: IpoTransaction = {
+          id: `ipo-buy-${entryId}`,
+          ipoId: entryId,
+          ticker: form.emiten,
+          side: 'BUY',
+          lot: form.lotJatah,
+          hargaPerLembar: form.hargaIpo,
+          nilaiKotor: nilaiKotorBuy,
+          feePersen: 0,
+          feeAmount: 0,
+          nilaiTotal: nilaiKotorBuy,
+          broker: form.broker,
+          pemilik: form.pemilik,
+          createdAt: new Date().toISOString(),
+        };
+        saveIpoTransactions([...existingTx, buyTx]);
+      }
+
+
+      // 2. Kembalikan saldo tidak jatah ke akun (lotPesan - lotJatah)
+      const lotTidakJatah = form.lotPesan - form.lotJatah;
+      if (lotTidakJatah > 0) {
+        const refundAmount = form.hargaIpo * lotTidakJatah * 100;
+        const accounts = loadAccounts();
+        const updatedAccounts = accounts.map(a => {
+          if (a.nama.toLowerCase() === form.pemilik.toLowerCase() &&
+              a.broker.toLowerCase() === form.broker.toLowerCase()) {
+            return { ...a, saldo: a.saldo + refundAmount };
+          }
+          return a;
+        });
+        saveAccountsData(updatedAccounts);
+      }
+    }
+
+    // ── Logika bisnis: Status → JUAL ───────────────────────────────────────────
+    if (form.status === 'JUAL' && prevEntry?.status !== 'JUAL' && form.lotJatah > 0 && form.hargaJual > 0) {
+      const existingTx = loadIpoTransactions();
+      const alreadySold = existingTx.some(t => t.ipoId === entryId && t.side === 'SELL');
+      if (!alreadySold) {
+        // Ambil fee jual dari akun sekuritas
+        const accounts = loadAccounts();
+        const matchAcc = accounts.find(a =>
+          a.nama.toLowerCase() === form.pemilik.toLowerCase() &&
+          a.broker.toLowerCase() === form.broker.toLowerCase()
+        );
+        const feeJualPersen = matchAcc?.feeJual ?? 0.29;
+        const nilaiKotor = form.hargaJual * form.lotJatah * 100;
+        const feeAmount = Math.round(nilaiKotor * (feeJualPersen / 100));
+        const nilaiNet = nilaiKotor - feeAmount;
+
+        const sellTx: IpoTransaction = {
+          id: `ipo-sell-${entryId}`,
+          ipoId: entryId,
+          ticker: form.emiten,
+          side: 'SELL',
+          lot: form.lotJatah,
+          hargaPerLembar: form.hargaJual,
+          nilaiKotor,
+          feePersen: feeJualPersen,
+          feeAmount,
+          nilaiTotal: nilaiNet,
+          broker: form.broker,
+          pemilik: form.pemilik,
+          createdAt: new Date().toISOString(),
+        };
+        saveIpoTransactions([...existingTx, sellTx]);
+      }
+    }
+
+    // ── Logika bisnis: Status → TIDAK_JATAH ───────────────────────────────────
+    if (form.status === 'TIDAK_JATAH' && prevEntry?.status !== 'TIDAK_JATAH') {
+      const refundAmount = form.hargaIpo * form.lotPesan * 100;
+      if (refundAmount > 0) {
+        const accounts = loadAccounts();
+        const updatedAccounts = accounts.map(a => {
+          if (a.nama.toLowerCase() === form.pemilik.toLowerCase() &&
+              a.broker.toLowerCase() === form.broker.toLowerCase()) {
+            return { ...a, saldo: a.saldo + refundAmount };
+          }
+          return a;
+        });
+        saveAccountsData(updatedAccounts);
+      }
+    }
+
     const updated = editing
-      ? list.map(i => i.id === editing.id ? { ...form, id: editing.id } : i)
-      : [...list, { ...form, id: Date.now().toString() }];
+      ? list.map(i => i.id === editing.id ? newEntry : i)
+      : [...list, newEntry];
     setList(updated); saveIpoData(updated); setShowForm(false);
   };
 
@@ -178,21 +314,38 @@ export function IpoPage() {
             </div>
             <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               {inp('Emiten (Ticker)', 'emiten')}
-              {inp('Pemilik Akun', 'pemilik')}
-              {inp('Broker', 'broker')}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</label>
                 <select value={form.status} onChange={e => setForm(v => ({ ...v, status: e.target.value as IpoStatus }))}
-                  style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+                  style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'white' }}>
                   {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Akun Sekuritas (Broker)</label>
+                <select 
+                  value={`${form.pemilik}|${form.broker}`} 
+                  onChange={e => {
+                    const [pemilik, broker] = e.target.value.split('|');
+                    setForm(v => ({ ...v, pemilik, broker }));
+                  }}
+                  style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'white' }}
+                >
+                  <option value="|">-- Pilih Akun Sekuritas --</option>
+                  {(() => {
+                    const freshAcc = loadAccounts();
+                    return freshAcc.map(a => (
+                      <option key={a.id} value={`${a.nama}|${a.broker}`}>
+                        {a.broker} ({a.nama}) - Saldo +T2: {fmtCur2(a.saldo)}
+                      </option>
+                    ));
+                  })()}
                 </select>
               </div>
               {inp('Harga IPO (Rp)', 'hargaIpo', 'number')}
               {inp('Lot Dipesan', 'lotPesan', 'number')}
               {inp('Lot Dijatahkan', 'lotJatah', 'number')}
               {inp('Harga Jual (Rp)', 'hargaJual', 'number')}
-              {inp('Tgl Pemesanan', 'tanggalPesan', 'date')}
-              {inp('Tgl Listing', 'tanggalListing', 'date')}
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Catatan</label>
                 <textarea value={form.catatan} onChange={e => setForm(v => ({ ...v, catatan: e.target.value }))} rows={2}
@@ -204,6 +357,41 @@ export function IpoPage() {
                   <div style={{ gridColumn: '1 / -1', background: p >= 0 ? 'var(--success-light)' : 'var(--danger-light)', borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: p >= 0 ? 'var(--success)' : 'var(--danger)' }}>Estimasi P&L</span>
                     <span style={{ fontSize: 18, fontWeight: 900, color: p >= 0 ? 'var(--success)' : 'var(--danger)' }}>{p >= 0 ? '+' : ''}{fmtCur2(p)}</span>
+                  </div>
+                );
+              })()}
+              
+              {form.hargaIpo > 0 && form.lotPesan > 0 && (() => {
+                const requiredFunds = form.hargaIpo * form.lotPesan * 100;
+                const freshAccounts = loadAccounts();
+                const matchingA = freshAccounts.find(a => a.nama.toLowerCase() === form.pemilik.toLowerCase() && a.broker.toLowerCase() === form.broker.toLowerCase());
+                const currentSaldo = matchingA?.saldo ?? 0;
+                const shortfall = requiredFunds - currentSaldo;
+                
+                return (
+                  <div style={{ gridColumn: '1 / -1', background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Total Kebutuhan Dana</span>
+                      <span style={{ fontSize: 14, fontWeight: 800 }}>{fmtCur2(requiredFunds)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Saldo {matchingA ? `(${matchingA.nama} - ${matchingA.broker})` : 'Sekuritas'}</span>
+                      <span style={{ fontSize: 14, fontWeight: 800 }}>{matchingA ? fmtCur2(currentSaldo) : 'Data akun tidak diisi/ditemukan'}</span>
+                    </div>
+                    
+                    <div style={{ paddingTop: 8, borderTop: '1px solid var(--border-light)', marginTop: 8 }}>
+                      {shortfall > 0 ? (
+                        <div style={{ background: 'var(--danger-light)', color: 'var(--danger)', padding: '10px 14px', borderRadius: 8, fontSize: 13, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600, lineHeight: 1.4 }}>
+                          <span>⚠️</span>
+                          <span>Saldo kurang <strong>{fmtCur2(shortfall)}</strong></span>
+                        </div>
+                      ) : (
+                        <div style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '10px 14px', borderRadius: 8, fontSize: 13, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600, lineHeight: 1.4 }}>
+                          <span>✅</span>
+                          <span>Saldo di sekuritas Anda mencukupi untuk pemesanan ini.</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
@@ -220,21 +408,16 @@ export function IpoPage() {
 }
 
 // ─── ACCOUNT SECTION (untuk Settings) ─────────────────────────────────────────
-type AccountEntry = { id: string; nama: string; rdn: string; broker: string; saldo: number; catatan: string };
-const ACCOUNT_KEY = 'stock_journal_accounts';
-const loadAccounts = (): AccountEntry[] => { try { const r = localStorage.getItem(ACCOUNT_KEY); if (r) return JSON.parse(r); } catch {} return []; };
-const saveAccountsData = (l: AccountEntry[]) => localStorage.setItem(ACCOUNT_KEY, JSON.stringify(l));
-
 export function AccountSection() {
   const [accounts, setAccounts] = useState<AccountEntry[]>(loadAccounts);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<AccountEntry | null>(null);
-  const [form, setForm]         = useState({ nama: '', rdn: '', broker: 'RHB', saldo: 0, catatan: '' });
+  const [form, setForm]         = useState({ nama: '', rdn: '', broker: 'RHB', saldo: 0, catatan: '', feeBeli: 0.19, feeJual: 0.29 });
   const [saved, setSaved]       = useState(false);
 
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
 
-  const openAdd  = () => { setForm({ nama: '', rdn: '', broker: 'RHB', saldo: 0, catatan: '' }); setEditing(null); setShowForm(true); };
+  const openAdd  = () => { setForm({ nama: '', rdn: '', broker: 'RHB', saldo: 0, catatan: '', feeBeli: 0.19, feeJual: 0.29 }); setEditing(null); setShowForm(true); };
   const openEdit = (a: AccountEntry) => { setForm({ ...a }); setEditing(a); setShowForm(true); };
 
   const save = () => {
@@ -295,7 +478,15 @@ export function AccountSection() {
                   <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Wallet size={12} />Saldo</span>
                   <span style={{ fontWeight: 800, color: 'var(--success)' }}>{fmtCur2(a.saldo)}</span>
                 </div>
-                {a.catatan && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>{a.catatan}</div>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <div style={{ flex: 1, background: 'var(--success-light)', color: 'var(--success)', padding: '4px 6px', borderRadius: 6, fontSize: 10, fontWeight: 700, textAlign: 'center' }}>
+                    Beli: {a.feeBeli ?? 0}%
+                  </div>
+                  <div style={{ flex: 1, background: 'var(--danger-light)', color: 'var(--danger)', padding: '4px 6px', borderRadius: 6, fontSize: 10, fontWeight: 700, textAlign: 'center' }}>
+                    Jual: {a.feeJual ?? 0}%
+                  </div>
+                </div>
+                {a.catatan && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 4 }}>{a.catatan}</div>}
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                 <button onClick={() => openEdit(a)} style={{ flex: 1, background: 'var(--primary-light)', color: 'var(--primary)', border: 'none', borderRadius: 8, padding: '6px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>✏️ Edit</button>
@@ -318,6 +509,12 @@ export function AccountSection() {
               {inp2('Broker', 'broker')}
               <div style={{ gridColumn: '1 / -1' }}>{inp2('Nomor RDN', 'rdn')}</div>
               <div style={{ gridColumn: '1 / -1' }}>{inp2('Saldo Terakhir (Rp)', 'saldo', 'number')}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {inp2('Fee Beli (%)', 'feeBeli', 'number')}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {inp2('Fee Jual (%)', 'feeJual', 'number')}
+              </div>
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Catatan</label>
                 <input value={form.catatan} onChange={e => setForm(v => ({ ...v, catatan: e.target.value }))}

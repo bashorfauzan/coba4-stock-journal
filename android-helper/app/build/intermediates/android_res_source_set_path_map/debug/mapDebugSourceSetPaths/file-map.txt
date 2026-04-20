@@ -1,8 +1,0 @@
-com.coba4.stockjournal.app-pngs-0 /Users/bashorfauzan/Documents/coba4/android-helper/app/build/generated/res/pngs/debug
-com.coba4.stockjournal.app-resValues-1 /Users/bashorfauzan/Documents/coba4/android-helper/app/build/generated/res/resValues/debug
-com.coba4.stockjournal.app-updated_navigation_xml-2 /Users/bashorfauzan/Documents/coba4/android-helper/app/build/generated/updated_navigation_xml/debug
-com.coba4.stockjournal.app-packageDebugResources-3 /Users/bashorfauzan/Documents/coba4/android-helper/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
-com.coba4.stockjournal.app-packageDebugResources-4 /Users/bashorfauzan/Documents/coba4/android-helper/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
-com.coba4.stockjournal.app-debug-5 /Users/bashorfauzan/Documents/coba4/android-helper/app/build/intermediates/merged_res/debug/mergeDebugResources
-com.coba4.stockjournal.app-debug-6 /Users/bashorfauzan/Documents/coba4/android-helper/app/src/debug/res
-com.coba4.stockjournal.app-main-7 /Users/bashorfauzan/Documents/coba4/android-helper/app/src/main/res

@@ -111,6 +111,158 @@ export function Topbar({ page, syncing }: { page: PageId; syncing: boolean }) {
   );
 }
 
+// ─── HELPER: compute period stats ─────────────────────────────────────────────
+type PeriodKey = 'today' | 'month' | 'all';
+
+function computePeriodStats(transactions: StockTransaction[], period: PeriodKey) {
+  const now = new Date();
+  const filtered = transactions.filter(tx => {
+    const d = new Date(tx.tradedAt);
+    if (period === 'today') {
+      return d.toDateString() === now.toDateString();
+    }
+    if (period === 'month') {
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
+    return true;
+  });
+
+  let buyValue = 0, sellValue = 0, buyCount = 0, sellCount = 0;
+  // Simple FIFO realized P&L for filtered txs (sorted by date)
+  const sorted = [...filtered].sort((a, b) => new Date(a.tradedAt).getTime() - new Date(b.tradedAt).getTime());
+  const map = new Map<string, { netLots: number; avgBuyPrice: number; realizedProfit: number }>();
+  for (const tx of sorted) {
+    const cur = map.get(tx.ticker) ?? { netLots: 0, avgBuyPrice: 0, realizedProfit: 0 };
+    if (tx.side === 'BUY') {
+      buyValue += tx.netValue; buyCount++;
+      const next = cur.netLots + tx.lot;
+      cur.avgBuyPrice = next > 0 ? (cur.avgBuyPrice * cur.netLots + tx.pricePerShare * tx.lot) / next : 0;
+      cur.netLots = next;
+    } else {
+      sellValue += tx.netValue; sellCount++;
+      cur.realizedProfit += tx.netValue - cur.avgBuyPrice * tx.lot * 100;
+      cur.netLots -= tx.lot;
+    }
+    map.set(tx.ticker, cur);
+  }
+  const realizedProfit = Array.from(map.values()).reduce((s, p) => s + p.realizedProfit, 0);
+  return { buyValue, sellValue, buyCount, sellCount, realizedProfit, total: filtered.length };
+}
+
+// ─── HELPER: compute monthly chart data ────────────────────────────────────────
+function computeMonthlyData(transactions: StockTransaction[]) {
+  const map = new Map<string, { label: string; buyValue: number; sellValue: number; count: number; month: number; year: number }>();
+  for (const tx of transactions) {
+    const d = new Date(tx.tradedAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = new Intl.DateTimeFormat('id-ID', { month: 'short', year: '2-digit' }).format(d);
+    const cur = map.get(key) ?? { label, buyValue: 0, sellValue: 0, count: 0, month: d.getMonth(), year: d.getFullYear() };
+    if (tx.side === 'BUY') { cur.buyValue += tx.netValue; cur.count++; }
+    else { cur.sellValue += tx.netValue; cur.count++; }
+    map.set(key, cur);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v)
+    .slice(-6); // 6 bulan terakhir
+}
+
+// ─── MONTHLY GROWTH CHART ─────────────────────────────────────────────────────
+function MonthlyGrowthChart({ transactions }: { transactions: StockTransaction[] }) {
+  const [activeMetric, setActiveMetric] = useState<'buy' | 'sell' | 'count'>('buy');
+  const data = computeMonthlyData(transactions);
+
+  if (data.length === 0) {
+    return (
+      <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+        Belum ada data transaksi untuk ditampilkan
+      </div>
+    );
+  }
+
+  const values = data.map(d => activeMetric === 'buy' ? d.buyValue : activeMetric === 'sell' ? d.sellValue : d.count);
+  const maxVal = Math.max(...values, 1);
+  const fmtC = (v: number) => {
+    if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}M`;
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}Jt`;
+    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}Rb`;
+    return String(v);
+  };
+
+  const metrics: { key: 'buy' | 'sell' | 'count'; label: string; color: string }[] = [
+    { key: 'buy',   label: 'Total Beli', color: 'var(--primary)' },
+    { key: 'sell',  label: 'Total Jual', color: 'var(--success)' },
+    { key: 'count', label: 'Jumlah Tx',  color: '#F59E0B' },
+  ];
+  const activeColor = metrics.find(m => m.key === activeMetric)!.color;
+
+  return (
+    <div>
+      {/* Metric Tabs */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, padding: '0 16px' }}>
+        {metrics.map(m => (
+          <button key={m.key} onClick={() => setActiveMetric(m.key)} style={{
+            padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontSize: 11, fontWeight: 700, fontFamily: 'inherit', transition: 'all 0.15s',
+            background: activeMetric === m.key ? m.color : 'var(--bg-app)',
+            color: activeMetric === m.key ? 'white' : 'var(--text-muted)',
+            boxShadow: activeMetric === m.key ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+          }}>{m.label}</button>
+        ))}
+      </div>
+
+      {/* Bar Chart */}
+      <div style={{ padding: '0 16px 16px', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, minWidth: data.length * 52, height: 140 }}>
+          {data.map((d, i) => {
+            const val = activeMetric === 'buy' ? d.buyValue : activeMetric === 'sell' ? d.sellValue : d.count;
+            const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+            const barH = Math.max(pct * 1.1, val > 0 ? 4 : 0);
+            const isLast = i === data.length - 1;
+            return (
+              <div key={d.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 44 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: isLast ? activeColor : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  {val > 0 ? fmtC(val) : ''}
+                </span>
+                <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', height: 90 }}>
+                  <div style={{
+                    width: '100%', borderRadius: '6px 6px 0 0',
+                    background: isLast
+                      ? activeColor
+                      : `color-mix(in srgb, ${activeColor} 45%, transparent)`,
+                    height: `${barH}%`,
+                    minHeight: val > 0 ? 4 : 0,
+                    transition: 'height 0.4s ease',
+                    position: 'relative',
+                  }} />
+                </div>
+                <span style={{ fontSize: 10, fontWeight: isLast ? 800 : 600, color: isLast ? activeColor : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  {d.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Monthly Summary Table */}
+      <div style={{ borderTop: '1px solid var(--border-light)', padding: '12px 16px 4px' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 10 }}>Ringkasan Per Bulan</div>
+        {data.slice().reverse().map(d => (
+          <div key={d.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{d.label}</div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+              <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Beli: {fmtC(d.buyValue)}</span>
+              <span style={{ color: 'var(--success)', fontWeight: 600 }}>Jual: {fmtC(d.sellValue)}</span>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{d.count}×</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
 export function DashboardPage({
   summary, positions, transactions, error
@@ -120,8 +272,17 @@ export function DashboardPage({
   transactions: StockTransaction[];
   error: string | null;
 }) {
-  const pnl = summary?.realizedProfit ?? 0;
+  const [period, setPeriod] = useState<PeriodKey>('all');
+
+  const periodStats = computePeriodStats(transactions, period);
+  const pnl = periodStats.realizedProfit;
   const isProfit = pnl >= 0;
+
+  const PERIOD_LABELS: Record<PeriodKey, string> = {
+    today: 'Hari Ini',
+    month: 'Bulan Ini',
+    all:   'Semua Waktu',
+  };
 
   return (
     <div className="page-content">
@@ -136,31 +297,45 @@ export function DashboardPage({
         </div>
       )}
 
+      {/* Period Filter */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {(['today', 'month', 'all'] as PeriodKey[]).map(p => (
+          <button key={p} onClick={() => setPeriod(p)} style={{
+            flex: 1, padding: '8px 4px', borderRadius: 10,
+            border: `1.5px solid ${period === p ? 'var(--primary)' : 'var(--border)'}`,
+            background: period === p ? 'var(--primary-light)' : 'var(--bg-white)',
+            color: period === p ? 'var(--primary)' : 'var(--text-secondary)',
+            fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+            transition: 'all 0.15s',
+          }}>
+            {PERIOD_LABELS[p]}
+          </button>
+        ))}
+      </div>
+
       {/* Hero Card */}
       <div className="hero-card">
         <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
-          Total Realized P&L
+          Realized P&L · {PERIOD_LABELS[period]}
         </p>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
           <span style={{ fontSize: 'clamp(24px, 6vw, 40px)', fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
-            {summary ? fmtCur(pnl) : '—'}
+            {fmtCur(pnl)}
           </span>
-          {summary && (
-            <span style={{
-              background: isProfit ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
-              color: isProfit ? '#6EE7B7' : '#FCA5A5',
-              padding: '3px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, marginBottom: 4
-            }}>
-              {isProfit ? '▲' : '▼'} {isProfit ? 'Cuan' : 'Rugi'}
-            </span>
-          )}
+          <span style={{
+            background: isProfit ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
+            color: isProfit ? '#6EE7B7' : '#FCA5A5',
+            padding: '3px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, marginBottom: 4
+          }}>
+            {isProfit ? '▲' : '▼'} {isProfit ? 'Cuan' : 'Rugi'}
+          </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 20px' }}>
           {[
-            { label: 'Total Beli', value: summary ? fmtCur(summary.buyValue) : '—' },
-            { label: 'Total Jual', value: summary ? fmtCur(summary.sellValue) : '—' },
-            { label: 'Transaksi Match', value: summary ? fmt(summary.transactions) : '—' },
-            { label: 'Emiten Aktif', value: String(positions.filter(p => p.netLots > 0).length) },
+            { label: 'Total Beli',       value: fmtCur(periodStats.buyValue)  },
+            { label: 'Total Jual',       value: fmtCur(periodStats.sellValue) },
+            { label: 'Transaksi Match',  value: fmt(periodStats.total)        },
+            { label: 'Emiten Aktif',     value: String(positions.filter(p => p.netLots > 0).length) },
           ].map(({ label, value }) => (
             <div key={label}>
               <p style={{ fontSize: 10, opacity: 0.65, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>{label}</p>
@@ -170,12 +345,15 @@ export function DashboardPage({
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="stat-grid">
-        <StatCard title="Realized P&L" value={summary ? fmtCur(pnl) : '...'} accent={isProfit ? 'success' : 'danger'} Icon={isProfit ? TrendingUp : TrendingDown} />
-        <StatCard title="Total Beli" value={summary ? fmtCur(summary.buyValue) : '...'} accent="primary" Icon={TrendingUp} />
-        <StatCard title="Total Jual" value={summary ? fmtCur(summary.sellValue) : '...'} accent="warning" Icon={TrendingDown} />
-        <StatCard title="Transaksi" value={summary ? fmt(summary.transactions) : '...'} accent="neutral" Icon={ClipboardList} />
+      {/* Monthly Growth Chart */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Pertumbuhan Bulanan</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>6 bulan terakhir</div>
+          </div>
+        </div>
+        <MonthlyGrowthChart transactions={transactions} />
       </div>
 
       {/* Recent Transactions */}

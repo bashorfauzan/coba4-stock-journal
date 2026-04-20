@@ -25,29 +25,29 @@ function App() {
         const { supabase } = await import('./lib/supabase');
 
         const [{ data: txData, error: txErr }, { data: notifData, error: notifErr }] = await Promise.all([
-          supabase.from('StockTransaction').select('*').order('tradedAt', { ascending: false }),
-          supabase.from('StockNotification').select('*').order('receivedAt', { ascending: false }).limit(100),
+          supabase.from('StockTransaction').select('*').eq('status', 'MATCHED').order('tradedAt', { ascending: false }),
+          supabase.from('StockNotification').select('*').eq('status', 'MATCHED').order('receivedAt', { ascending: false }).limit(100),
         ]);
 
         if (txErr) throw txErr;
         if (notifErr) throw notifErr;
         if (!active) return;
 
-        const txs  = (txData  || []) as StockTransaction[];
+        // Hanya transaksi MATCHED yang diproses (filter ganda: sudah difilter di query, dicek lagi di sini)
+        const txs  = ((txData  || []) as StockTransaction[]).filter(t => t.status === 'MATCHED');
         const notifs = (notifData || []) as { length: number };
 
         // ── Summary ──────────────────────────────────────────────────
+        // Semua txs sudah pasti MATCHED (difilter di query & client)
         const sum: StockSummary = { notifications: notifs.length, transactions: txs.length, buyCount: 0, sellCount: 0, buyValue: 0, sellValue: 0, realizedProfit: 0 };
         txs.forEach(tx => {
-          if (tx.status === 'MATCHED') {
-            if (tx.side === 'BUY')  { sum.buyValue  += tx.netValue; sum.buyCount++;  }
-            else                    { sum.sellValue += tx.netValue; sum.sellCount++; }
-          }
+          if (tx.side === 'BUY')  { sum.buyValue  += tx.netValue; sum.buyCount++;  }
+          else                    { sum.sellValue += tx.netValue; sum.sellCount++; }
         });
 
         // ── Positions (FIFO avg cost) ─────────────────────────────────
+        // txs sudah MATCHED semua, langsung sort untuk FIFO
         const matched = [...txs]
-          .filter(t => t.status === 'MATCHED')
           .sort((a, b) => new Date(a.tradedAt).getTime() - new Date(b.tradedAt).getTime());
 
         const map = new Map<string, StockPosition>();

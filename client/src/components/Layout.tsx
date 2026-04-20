@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
   LayoutDashboard, PieChart, ClipboardList, Settings,
-  TrendingUp, TrendingDown, AlertCircle, Rocket
+  TrendingUp, AlertCircle, Rocket
 } from 'lucide-react';
-import type { StockSummary, StockPosition, StockTransaction } from '../api';
+import type { StockPosition, StockTransaction } from '../api';
 import { AccountSection, loadIpoTransactions } from './IpoAccount';
 import type { IpoTransaction } from './IpoAccount';
 
@@ -265,9 +265,8 @@ function MonthlyGrowthChart({ transactions }: { transactions: StockTransaction[]
 
 // ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
 export function DashboardPage({
-  summary, positions, transactions, error
+  positions, transactions, error
 }: {
-  summary: StockSummary | null;
   positions: StockPosition[];
   transactions: StockTransaction[];
   error: string | null;
@@ -366,33 +365,6 @@ export function DashboardPage({
         </div>
         <div>
           <TransactionTable transactions={transactions.slice(0, 5)} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── STAT CARD ────────────────────────────────────────────────────────────────
-type AccentType = 'primary' | 'success' | 'danger' | 'warning' | 'neutral';
-const ACCENT_MAP: Record<AccentType, { bg: string; color: string; iconBg: string }> = {
-  primary: { bg: 'var(--primary-light)', color: 'var(--primary)', iconBg: 'var(--primary)' },
-  success: { bg: 'var(--success-light)', color: 'var(--success)', iconBg: 'var(--success)' },
-  danger:  { bg: 'var(--danger-light)',  color: 'var(--danger)',  iconBg: 'var(--danger)' },
-  warning: { bg: 'var(--warning-light)', color: 'var(--warning)', iconBg: 'var(--warning)' },
-  neutral: { bg: 'var(--border-light)',  color: 'var(--text-secondary)', iconBg: '#9CA3AF' },
-};
-
-function StatCard({ title, value, accent, Icon }: { title: string; value: string; accent: AccentType; Icon: any }) {
-  const { iconBg } = ACCENT_MAP[accent];
-  return (
-    <div className="stat-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-          <p style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1.3 }}>{title}</p>
-          <p style={{ fontSize: 'clamp(13px, 3.5vw, 18px)', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, lineHeight: 1.2, wordBreak: 'break-all' }}>{value}</p>
-        </div>
-        <div style={{ background: iconBg, borderRadius: 10, width: 34, height: 34, minWidth: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon size={16} color="white" />
         </div>
       </div>
     </div>

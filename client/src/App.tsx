@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import './index.css';
-import type { StockSummary, StockPosition, StockTransaction } from './api';
+import type { StockPosition, StockTransaction } from './api';
 import {
   Sidebar, BottomNav, Topbar,
   DashboardPage, PortfolioPage, TransactionsPage, SettingsPage,
@@ -12,7 +12,6 @@ function App() {
   const [page, setPage] = useState<PageId>('dashboard');
   const [loading, setLoading] = useState(true);
 
-  const [summary, setSummary]           = useState<StockSummary | null>(null);
   const [positions, setPositions]       = useState<StockPosition[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [error, setError]               = useState<string | null>(null);
@@ -24,26 +23,13 @@ function App() {
       try {
         const { supabase } = await import('./lib/supabase');
 
-        const [{ data: txData, error: txErr }, { data: notifData, error: notifErr }] = await Promise.all([
-          supabase.from('StockTransaction').select('*').eq('status', 'MATCHED').order('tradedAt', { ascending: false }),
-          supabase.from('StockNotification').select('*').eq('status', 'MATCHED').order('receivedAt', { ascending: false }).limit(100),
-        ]);
+        const { data: txData, error: txErr } = await supabase.from('StockTransaction').select('*').eq('status', 'MATCHED').order('tradedAt', { ascending: false });
 
         if (txErr) throw txErr;
-        if (notifErr) throw notifErr;
         if (!active) return;
 
         // Hanya transaksi MATCHED yang diproses (filter ganda: sudah difilter di query, dicek lagi di sini)
         const txs  = ((txData  || []) as StockTransaction[]).filter(t => t.status === 'MATCHED');
-        const notifs = (notifData || []) as { length: number };
-
-        // ── Summary ──────────────────────────────────────────────────
-        // Semua txs sudah pasti MATCHED (difilter di query & client)
-        const sum: StockSummary = { notifications: notifs.length, transactions: txs.length, buyCount: 0, sellCount: 0, buyValue: 0, sellValue: 0, realizedProfit: 0 };
-        txs.forEach(tx => {
-          if (tx.side === 'BUY')  { sum.buyValue  += tx.netValue; sum.buyCount++;  }
-          else                    { sum.sellValue += tx.netValue; sum.sellCount++; }
-        });
 
         // ── Positions (FIFO avg cost) ─────────────────────────────────
         // txs sudah MATCHED semua, langsung sort untuk FIFO
@@ -70,9 +56,7 @@ function App() {
         }
 
         const pos = Array.from(map.values()).sort((a, b) => a.ticker.localeCompare(b.ticker));
-        sum.realizedProfit = pos.reduce((s, p) => s + p.realizedProfit, 0);
 
-        setSummary(sum);
         setPositions(pos);
         setTransactions(txs);
         setError(null);
@@ -96,7 +80,7 @@ function App() {
       <div className="main-wrapper">
         <Topbar page={page} syncing={loading} />
 
-        {page === 'dashboard'    && <DashboardPage    summary={summary} positions={positions} transactions={transactions} error={error} />}
+        {page === 'dashboard'    && <DashboardPage    positions={positions} transactions={transactions} error={error} />}
         {page === 'portfolio'    && <PortfolioPage    positions={positions} />}
         {page === 'transactions' && <TransactionsPage transactions={transactions} />}
         {page === 'ipo'          && <IpoPage />}

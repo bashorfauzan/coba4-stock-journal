@@ -34,9 +34,9 @@ export default async function handler(req: any, res: any) {
     // Early return logic dihapus agar semua notifikasi tetap tersimpan di database 
     // untuk keperluan debugging, kita bisa lihat kalau ada parser yang gagal.
 
-    // Cek Duplikat di Supabase
+    // Cek Duplikat di Supabase (direvisi menjadi 15 detik untuk menghindari blokir pada Partial Matched beruntun)
     if (parsed.ticker && parsed.side && parsed.pricePerShare && parsed.lot) {
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60000).toISOString();
+      const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString();
       const { data: duplicates } = await supabase
         .from('StockNotification')
         .select('id')
@@ -45,7 +45,7 @@ export default async function handler(req: any, res: any) {
         .eq('side', parsed.side)
         .eq('pricePerShare', parsed.pricePerShare)
         .eq('lot', parsed.lot)
-        .gte('receivedAt', fiveMinutesAgo)
+        .gte('receivedAt', fifteenSecondsAgo)
         .limit(1);
 
       if (duplicates && duplicates.length > 0) {

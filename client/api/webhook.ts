@@ -31,17 +31,8 @@ export default async function handler(req: any, res: any) {
       String(text)
     );
 
-    // Filter Logic
-    if (parsed.status !== 'MATCHED') {
-      return res.status(200).json({
-        success: true,
-        createdTransaction: false,
-        reason: parsed.status === 'OPEN' 
-          ? 'Mengabaikan order OPEN, hanya mencatat MATCHED'
-          : (parsed.notes || 'Hanya mencatat order MATCHED'),
-        parsed
-      });
-    }
+    // Early return logic dihapus agar semua notifikasi tetap tersimpan di database 
+    // untuk keperluan debugging, kita bisa lihat kalau ada parser yang gagal.
 
     // Cek Duplikat di Supabase
     if (parsed.ticker && parsed.side && parsed.pricePerShare && parsed.lot) {
@@ -197,10 +188,15 @@ const parseNumeric = (value?: string | null) => {
 
 const detectTitleStatus = (combined: string): NotificationStatus => {
   const lower = combined.toLowerCase();
-  if (lower.includes('order matched') || lower.includes('matched') || lower.includes('done') || lower.includes('trade confirmation') || lower.includes('confirmation') || lower.includes('executed') || lower.includes('filled')) {
+  if (
+    lower.includes('order matched') || lower.includes('matched') || lower.includes('done') || 
+    lower.includes('trade confirmation') || lower.includes('confirmation') || 
+    lower.includes('executed') || lower.includes('filled') ||
+    lower.includes('berhasil') || lower.includes('sukses') || lower.includes('selesai')
+  ) {
     return 'MATCHED';
   }
-  if (lower.includes('order open') || lower.includes('open') || lower.includes('pending')) { return 'OPEN'; }
+  if (lower.includes('order open') || lower.includes('open') || lower.includes('pending') || lower.includes('antri')) { return 'OPEN'; }
   return 'FAILED';
 };
 
@@ -208,8 +204,8 @@ const extractTicker = (combined: string) => {
   const candidates = [
     extractField(combined, 'Stock'), extractField(combined, 'Code'), extractField(combined, 'Ticker'),
     combined.match(/\b(?:stock|ticker|code)\s*[:=-]?\s*([A-Z]{4,5})\b/i)?.[1],
-    combined.match(/\b(?:buy|sell)\s+([A-Z]{4,5})\b/i)?.[1],
-    combined.match(/\b([A-Z]{4,5})\s+(?:buy|sell)\b/i)?.[1],
+    combined.match(/\b(?:buy|sell|beli|jual)\s+([A-Z]{4,5})\b/i)?.[1],
+    combined.match(/\b([A-Z]{4,5})\s+(?:buy|sell|beli|jual)\b/i)?.[1],
     combined.match(/\b([A-Z]{4,5})\b(?=.*\b(?:lot|lots)\b)/i)?.[1]
   ];
   const raw = pickFirst(...candidates);
@@ -219,13 +215,13 @@ const extractTicker = (combined: string) => {
 const extractSide = (combined: string): StockSide | null => {
   const raw = pickFirst(
     extractField(combined, 'Side'), extractField(combined, 'Type'),
-    combined.match(/\bside\s*[:=-]?\s*(buy|sell)\b/i)?.[1],
-    combined.match(/\b(buy|sell)\b/i)?.[1], combined.match(/\b(b|s)\b(?=.*\blot\b)/i)?.[1]
+    combined.match(/\bside\s*[:=-]?\s*(buy|sell|beli|jual)\b/i)?.[1],
+    combined.match(/\b(buy|sell|beli|jual)\b/i)?.[1], combined.match(/\b(b|s)\b(?=.*\blot\b)/i)?.[1]
   );
   if (!raw) return null;
   const upper = toUpperWords(raw);
-  if (upper === 'BUY' || upper === 'B') return 'BUY';
-  if (upper === 'SELL' || upper === 'S') return 'SELL';
+  if (upper === 'BUY' || upper === 'B' || upper === 'BELI') return 'BUY';
+  if (upper === 'SELL' || upper === 'S' || upper === 'JUAL') return 'SELL';
   return null;
 };
 
